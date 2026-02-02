@@ -1,0 +1,53 @@
+{
+  "name": "@fabriziogianni7/openclaw-evm-wallet-integration",
+  "version": "0.1.0",
+  "description": "Native custodial wallet: OS keychain, configurable EVM chains, notify-and-approve flow",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "pretest": "npm run build",
+    "test": "node ./scripts/smoke-test.mjs",
+    "prepublishOnly": "pnpm build"
+  },
+  "keywords": [
+    "wallet",
+    "evm",
+    "viem",
+    "keychain",
+    "custodial"
+  ],
+  "author": "",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fabriziogianni7/openclaw-evm-wallet-integration.git"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "viem": "^2.45.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.9.3"
+  }
+}
