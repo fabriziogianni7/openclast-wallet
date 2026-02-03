@@ -21,7 +21,7 @@ import {
   createWalletServiceFromConfig,
   resolveWalletChains,
   type WalletIntegrationConfig,
-} from "@fabriziogianni7/openclaw-evm-wallet-integration";
+} from "openclast-wallet";
 
 const config: WalletIntegrationConfig = {
   wallets: {
@@ -44,6 +44,16 @@ if (service) {
 }
 ```
 
+### CLI
+
+Initialize a wallet from a JSON config:
+
+```bash
+openclast-wallet setup --config ./openclaw.config.json
+# or
+openclast-wallet init --config ./openclaw.config.json
+```
+
 ### State directory
 
 By default the package uses `resolveStateDir()` which reads `MOLTBOT_STATE_DIR` or `CLAWDBOT_STATE_DIR`, or falls back to `~/.moltbot` / `~/.clawdbot`. Wallets and pending tx state live under `<stateDir>/wallets/`.
@@ -60,6 +70,57 @@ By default the package uses `resolveStateDir()` which reads `MOLTBOT_STATE_DIR` 
 ### Keychain
 
 On **macOS**, private keys are stored in the system Keychain. On other platforms the keychain adapter is a stub (create/import throw; getPrivateKey returns null).
+
+## LLM Quick Guide
+
+Use the steps below when instructing an LLM to install and set up the wallet.
+
+### 1) Install
+
+```bash
+npm install openclast-wallet
+```
+
+### 2) Configure
+
+Create a JSON config that includes a `wallets` section:
+
+```json
+{
+  "wallets": {
+    "autoCreateOnStartup": true,
+    "chains": {
+      "sepolia": { "rpcUrl": "https://rpc.sepolia.org" },
+      "1": { "rpcUrl": "https://eth.llamarpc.com", "blockExplorerUrl": "https://etherscan.io" }
+    },
+    "defaults": {
+      "spending": {
+        "limitPerTx": "1000000000000000000",
+        "dailyLimit": "5000000000000000000"
+      }
+    },
+    "notify": { "primaryChannel": "slack" }
+  }
+}
+```
+
+### 3) Setup wallet
+
+```bash
+openclast-wallet setup --config ./openclaw.config.json
+```
+
+### 4) Use normally
+
+```ts
+import { createWalletServiceFromConfig } from "openclast-wallet";
+
+const service = createWalletServiceFromConfig(config);
+if (service) {
+  await service.ensureDefaultWallet();
+  const address = await service.getAddress();
+}
+```
 
 ## License
 

@@ -7,6 +7,9 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "readme": "./README.md",
+  "bin": {
+    "openclast-wallet": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -18,6 +21,8 @@
     "dist/index.js",
     "dist/index.js.map",
     "dist/index.d.ts",
+    "dist/cli.js",
+    "dist/cli.js.map",
     "README.md",
     "LICENSE"
   ],
