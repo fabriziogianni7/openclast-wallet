@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-evm-wallet-integration",
+  "name": "openclast-wallet",
   "version": "0.1.2",
   "description": "Native custodial wallet: OS keychain, configurable EVM chains, notify-and-approve flow",
   "type": "module",
@@ -41,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/fabriziogianni7/openclaw-evm-wallet-integration.git"
+    "url": "https://github.com/fabriziogianni7/openclast-wallet.git"
   },
   "engines": {
     "node": ">=22.12.0"

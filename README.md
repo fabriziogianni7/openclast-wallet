@@ -1,13 +1,13 @@
-# @fabriziogianni7/openclaw-evm-wallet-integration
+# Openclast Wallet
 
-Native custodial EVM wallet: OS keychain (macOS), configurable chains, notify-and-approve flow. Built with [viem](https://viem.sh).
+Native custodial EVM wallet for [openclaw](https://openclaw.ai/): OS keychain (macOS), configurable chains, notify-and-approve flow. Built with [viem](https://viem.sh).
 
 ## Install
 
 ```bash
-pnpm add @fabriziogianni7/openclaw-evm-wallet-integration
+pnpm add openclast-wallet
 # or
-npm install @fabriziogianni7/openclaw-evm-wallet-integration
+npm install openclast-wallet
 ```
 
 ## Usage
