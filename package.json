@@ -1,6 +1,6 @@
 {
   "name": "openclast-wallet",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Native custodial wallet: OS keychain, configurable EVM chains, notify-and-approve flow",
   "type": "module",
   "main": "./dist/index.js",

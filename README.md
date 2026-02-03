@@ -12,6 +12,30 @@ npm install openclast-wallet
 
 ## Usage
 
+### CLI
+
+Initialize a wallet from a JSON config:
+
+```bash
+openclast-wallet setup --config ./openclaw.config.json
+# or
+openclast-wallet init --config ./openclaw.config.json
+```
+
+### State directory
+
+By default the package uses `resolveStateDir()` which reads `MOLTBOT_STATE_DIR` or `CLAWDBOT_STATE_DIR`, or falls back to `~/.moltbot` / `~/.clawdbot`. Wallets and pending tx state live under `<stateDir>/wallets/`.
+
+### API overview
+
+- **createWalletService(config)** — build service from explicit `WalletServiceConfig` (stateDir, chains, defaultChainId, limits, etc.).
+- **createWalletServiceFromConfig(cfg)** — build service from `WalletIntegrationConfig`; uses default Sepolia if no chains are set.
+- **resolveWalletChains(cfg)**, **resolveDefaultChainId(cfg)**, **resolveWalletChainConfig(cfg, chainId)** — derive chain config from `WalletIntegrationConfig`.
+- **resolveWalletChainConfigForBalance(cfg, chainId)** — chain config for read-only use (config + well-known public RPCs).
+- **getBlockExplorerTxUrl(cfg, chainId, txHash)**, **getBlockExplorerAddressUrl(cfg, chainId, address)** — block explorer URLs.
+- **WalletService** — ensureDefaultWallet, createWallet, importWallet, recoverFromMnemonic, getAddress, getDefaultWalletId, getPrivateKey, requestSend, requestErc20Approve, requestErc20Transfer, requestContractCall, approveTx, getPendingTx, listPending.
+
+
 ### Config shape
 
 Use `WalletIntegrationConfig` (compatible with a `wallets` slice of a larger config):
@@ -44,32 +68,10 @@ if (service) {
 }
 ```
 
-### CLI
-
-Initialize a wallet from a JSON config:
-
-```bash
-openclast-wallet setup --config ./openclaw.config.json
-# or
-openclast-wallet init --config ./openclaw.config.json
-```
-
-### State directory
-
-By default the package uses `resolveStateDir()` which reads `MOLTBOT_STATE_DIR` or `CLAWDBOT_STATE_DIR`, or falls back to `~/.moltbot` / `~/.clawdbot`. Wallets and pending tx state live under `<stateDir>/wallets/`.
-
-### API overview
-
-- **createWalletService(config)** — build service from explicit `WalletServiceConfig` (stateDir, chains, defaultChainId, limits, etc.).
-- **createWalletServiceFromConfig(cfg)** — build service from `WalletIntegrationConfig`; uses default Sepolia if no chains are set.
-- **resolveWalletChains(cfg)**, **resolveDefaultChainId(cfg)**, **resolveWalletChainConfig(cfg, chainId)** — derive chain config from `WalletIntegrationConfig`.
-- **resolveWalletChainConfigForBalance(cfg, chainId)** — chain config for read-only use (config + well-known public RPCs).
-- **getBlockExplorerTxUrl(cfg, chainId, txHash)**, **getBlockExplorerAddressUrl(cfg, chainId, address)** — block explorer URLs.
-- **WalletService** — ensureDefaultWallet, createWallet, importWallet, recoverFromMnemonic, getAddress, getDefaultWalletId, getPrivateKey, requestSend, requestErc20Approve, requestErc20Transfer, requestContractCall, approveTx, getPendingTx, listPending.
-
-### Keychain
+### Important Note
 
 On **macOS**, private keys are stored in the system Keychain. On other platforms the keychain adapter is a stub (create/import throw; getPrivateKey returns null).
+This is still under development so BE CAREFUL AND USE IT IN PRODUCTION AT YOUR OWN RISK
 
 ## LLM Quick Guide
 

@@ -76,4 +76,10 @@ async function run(): Promise<void> {
   }
 }
 
-run();
+try {
+  await run();
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Setup failed: ${message}`);
+  process.exitCode = 1;
+}
