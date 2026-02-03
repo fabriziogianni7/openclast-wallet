@@ -1,0 +1,34 @@
+{
+  "wallets": {
+    "autoCreateOnStartup": true,
+    "chains": {
+      "1": {
+        "rpcUrl": "https://eth.llamarpc.com",
+        "blockExplorerUrl": "https://etherscan.io"
+      },
+      "sepolia": {
+        "rpcUrl": "https://rpc.sepolia.org",
+        "blockExplorerUrl": "https://sepolia.etherscan.io"
+      },
+      "137": {
+        "rpcUrl": "https://polygon.llamarpc.com",
+        "blockExplorerUrl": "https://polygonscan.com"
+      },
+      "8453": {
+        "rpcUrl": "https://mainnet.base.org",
+        "blockExplorerUrl": "https://basescan.org"
+      },
+      "42161": {
+        "rpcUrl": "https://arb1.arbitrum.io/rpc",
+        "blockExplorerUrl": "https://arbiscan.io"
+      }
+    },
+    "defaults": {
+      "spending": {
+        "limitPerTx": "1000000000000000000",
+        "dailyLimit": "5000000000000000000"
+      }
+    },
+    "notify": { "primaryChannel": "telegram" }
+  }
+}

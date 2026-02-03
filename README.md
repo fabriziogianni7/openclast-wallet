@@ -10,16 +10,87 @@ pnpm add openclast-wallet
 npm install openclast-wallet
 ```
 
+## OpenClaw plugin install
+
+If you want OpenClaw to discover this wallet as a plugin:
+
+```bash
+openclaw plugins install openclast-wallet
+```
+
+Then add config under `plugins.entries.openclast-wallet.config` and restart the Gateway:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclast-wallet": {
+        "enabled": true,
+        "config": {
+          "wallets": {
+            "autoCreateOnStartup": true,
+            "chains": {
+              "sepolia": { "rpcUrl": "https://rpc.sepolia.org" },
+              "1": {
+                "rpcUrl": "https://eth.llamarpc.com",
+                "blockExplorerUrl": "https://etherscan.io"
+              }
+            },
+            "defaults": {
+              "spending": {
+                "limitPerTx": "1000000000000000000",
+                "dailyLimit": "5000000000000000000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Tools exposed by the plugin:
+
+- `wallet_address`
+- `wallet_balance`
+- `wallet_send`
+- `wallet_txStatus`
+- `wallet_approve`
+- `wallet_erc20_approve`
+- `wallet_erc20_transfer`
+- `wallet_contract_call`
+
 ## Usage
 
 ### CLI
 
-Initialize a wallet from a JSON config:
+Initialize a wallet from a JSON config you create (e.g. `wallet-config.json`). A starter `wallet-config.json` ships with the package. Keep this file separate from `openclaw.json` (Openclaw config does not accept a top-level `wallets` key).
 
 ```bash
-openclast-wallet setup --config ./openclaw.config.json
+openclast-wallet setup --config ./wallet-config.json
 # or
-openclast-wallet init --config ./openclaw.config.json
+openclast-wallet init --config ./wallet-config.json
+
+# create a starter config in the current folder
+openclast-wallet setup
+
+# install agent skill into ./skills/openclast-wallet
+openclast-wallet install-skill
+
+# create a new wallet entry (defaults to ./wallet-config.json if --config omitted)
+openclast-wallet create --config ./wallet-config.json
+
+# export private key (requires confirmation + env gate; defaults to ./wallet-config.json if --config omitted)
+MOLTBOT_ALLOW_WALLET_EXPORT=1 openclast-wallet export --config ./wallet-config.json --yes
+
+# restore from private key (defaults to ./wallet-config.json if --config omitted)
+openclast-wallet restore --config ./wallet-config.json --private-key 0x...
+
+# restore from mnemonic (defaults to ./wallet-config.json if --config omitted)
+openclast-wallet restore --config ./wallet-config.json --mnemonic "word1 word2 ... word12"
+# or
+openclast-wallet restore --config ./wallet-config.json --mnemonic-file ./seed.txt --account-index 0
 ```
 
 ### State directory
@@ -73,6 +144,14 @@ if (service) {
 On **macOS**, private keys are stored in the system Keychain. On other platforms the keychain adapter is a stub (create/import throw; getPrivateKey returns null).
 This is still under development so BE CAREFUL AND USE IT IN PRODUCTION AT YOUR OWN RISK
 
+### Agent skill
+
+The package ships an agent skill at `skills/openclast-wallet/SKILL.md`. It is copied to `./skills/openclast-wallet` automatically on install, or you can run:
+
+```bash
+openclast-wallet install-skill
+```
+
 ## LLM Quick Guide
 
 Use the steps below when instructing an LLM to install and set up the wallet.
@@ -85,7 +164,7 @@ npm install openclast-wallet
 
 ### 2) Configure
 
-Create a JSON config that includes a `wallets` section:
+Create a JSON config file (for example `wallet-config.json`) that includes a `wallets` section. Keep it separate from `openclaw.json` and pass it to the CLI. You can start from the packaged `wallet-config.json` or generate one with `openclast-wallet setup`.
 
 ```json
 {
@@ -109,7 +188,27 @@ Create a JSON config that includes a `wallets` section:
 ### 3) Setup wallet
 
 ```bash
-openclast-wallet setup --config ./openclaw.config.json
+openclast-wallet setup --config ./wallet-config.json
+```
+
+You can also generate a starter config with:
+
+```bash
+openclast-wallet setup
+```
+
+### 3b) Install agent skill (optional)
+
+```bash
+openclast-wallet install-skill
+```
+
+### 3c) Create / export / restore
+
+```bash
+openclast-wallet create --config ./wallet-config.json
+MOLTBOT_ALLOW_WALLET_EXPORT=1 openclast-wallet export --config ./wallet-config.json --yes
+openclast-wallet restore --config ./wallet-config.json --private-key 0x...
 ```
 
 ### 4) Use normally
