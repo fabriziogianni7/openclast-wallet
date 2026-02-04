@@ -1,5 +1,7 @@
 # Openclast Wallet
 
+> This plugin is still under development so BE CAREFUL AND USE IT IN PRODUCTION AT YOUR OWN RISK
+
 Native custodial EVM wallet for [openclaw](https://openclaw.ai/): OS keychain (macOS), configurable chains, notify-and-approve flow. Built with [viem](https://viem.sh).
 
 
@@ -182,7 +184,7 @@ This is still under development so BE CAREFUL AND USE IT IN PRODUCTION AT YOUR O
 
 ### Agent skill
 
-The package ships an agent skill at `skills/openclast-wallet/SKILL.md`. It is copied to `./skills/openclast-wallet` automatically on install, or you can run:
+The package ships an agent skill at `skills/openclast-wallet/SKILL.md`. It is copied to `./skills/openclast-wallet` automatically on install (there is a warnign here: [read this issue](https://github.com/fabriziogianni7/openclast-wallet/issues/1#issuecomment-3846855008)), or you can run:
 
 ```bash
 openclast-wallet install-skill
