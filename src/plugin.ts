@@ -111,6 +111,13 @@ const walletContractCallSchema = Type.Object({
   to: Type.String({ description: "Contract address (0x...)" }),
   valueWei: Type.Optional(Type.String({ description: "ETH value in wei" })),
   data: Type.String({ description: "Calldata (0x...)" }),
+  gasLimit: Type.Optional(Type.String({ description: "Gas limit override" })),
+  gasPrice: Type.Optional(Type.String({ description: "Legacy gas price (wei)" })),
+  maxFeePerGas: Type.Optional(Type.String({ description: "EIP-1559 max fee (wei)" })),
+  maxPriorityFeePerGas: Type.Optional(
+    Type.String({ description: "EIP-1559 priority fee (wei)" }),
+  ),
+  nonce: Type.Optional(Type.Number({ description: "Nonce override" })),
 });
 
 const walletSetDefaultSchema = Type.Object({
@@ -331,6 +338,15 @@ const walletPlugin = {
         const to = typeof params.to === "string" ? params.to : "";
         const data = typeof params.data === "string" ? params.data : "";
         const valueWei = typeof params.valueWei === "string" ? params.valueWei : undefined;
+        const gasLimit = typeof params.gasLimit === "string" ? params.gasLimit : undefined;
+        const gasPrice = typeof params.gasPrice === "string" ? params.gasPrice : undefined;
+        const maxFeePerGas =
+          typeof params.maxFeePerGas === "string" ? params.maxFeePerGas : undefined;
+        const maxPriorityFeePerGas =
+          typeof params.maxPriorityFeePerGas === "string"
+            ? params.maxPriorityFeePerGas
+            : undefined;
+        const nonce = typeof params.nonce === "number" ? params.nonce : undefined;
         const chainId = typeof params.chainId === "number" ? params.chainId : undefined;
         const walletId = typeof params.walletId === "string" ? params.walletId : undefined;
         const result = await svc.requestContractCall({
@@ -339,6 +355,11 @@ const walletPlugin = {
           to,
           valueWei,
           data,
+          gasLimit,
+          gasPrice,
+          maxFeePerGas,
+          maxPriorityFeePerGas,
+          nonce,
         });
         return { txId: result.txId, pending: result.pending };
       }),

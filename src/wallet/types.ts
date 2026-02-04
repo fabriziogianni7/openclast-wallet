@@ -23,6 +23,9 @@ export type PendingTx = {
   valueWei: string;
   data?: string;
   gasLimit?: string;
+  gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
   nonce?: number;
   createdAt: number;
   status: "pending" | "approved" | "rejected" | "sent" | "failed";

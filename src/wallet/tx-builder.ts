@@ -16,6 +16,9 @@ export type TxParams = {
   valueWei: bigint;
   data?: string;
   gasLimit?: bigint;
+  gasPrice?: bigint;
+  maxFeePerGas?: bigint;
+  maxPriorityFeePerGas?: bigint;
   nonce?: number;
 };
 
@@ -30,14 +33,21 @@ export function privateKeyToAddress(privateKeyHex: string): string {
   return account.address as string;
 }
 
-export async function buildAndSignTx(params: {
+export type BuildAndSignTxParams = {
   privateKeyHex: string;
   chainId: number;
   to: string;
   valueWei: bigint;
   data?: string;
+  gasLimit?: bigint;
+  gasPrice?: bigint;
+  maxFeePerGas?: bigint;
+  maxPriorityFeePerGas?: bigint;
+  nonce?: number;
   rpc: RpcClient;
-}): Promise<SignedTx> {
+};
+
+export async function buildAndSignTx(params: BuildAndSignTxParams): Promise<SignedTx> {
   const key = (params.privateKeyHex.startsWith("0x")
     ? params.privateKeyHex
     : "0x" + params.privateKeyHex) as Hex;
@@ -46,22 +56,28 @@ export async function buildAndSignTx(params: {
   const data = params.data ? (params.data.startsWith("0x") ? params.data : `0x${params.data}`) as Hex : undefined;
 
   const from = account.address as Address;
-  const nonce = await params.rpc.getTransactionCount(from);
-  const gasLimit = await params.rpc.estimateGas({
-    from,
-    to,
-    value: params.valueWei,
-    data: params.data,
-  });
-  const gas = gasLimit + BigInt(10000);
+  const nonce =
+    typeof params.nonce === "number" ? params.nonce : await params.rpc.getTransactionCount(from);
+  const gas =
+    params.gasLimit != null
+      ? params.gasLimit
+      : (await params.rpc.estimateGas({
+          from,
+          to,
+          value: params.valueWei,
+          data: params.data,
+        })) + BigInt(10000);
 
   const client = params.rpc.publicClient;
 
   let tx: Parameters<typeof account.signTransaction>[0];
-  try {
+  if (params.maxFeePerGas != null || params.maxPriorityFeePerGas != null) {
     const fees = await client.estimateFeesPerGas();
-    const maxFeePerGas = (fees.maxFeePerGas * GAS_FEE_BUFFER_MULTIPLIER) / GAS_FEE_BUFFER_DIVISOR;
+    const maxFeePerGas =
+      params.maxFeePerGas ??
+      (fees.maxFeePerGas * GAS_FEE_BUFFER_MULTIPLIER) / GAS_FEE_BUFFER_DIVISOR;
     const maxPriorityFeePerGas =
+      params.maxPriorityFeePerGas ??
       (fees.maxPriorityFeePerGas * GAS_FEE_BUFFER_MULTIPLIER) / GAS_FEE_BUFFER_DIVISOR;
     tx = {
       type: "eip1559",
@@ -74,9 +90,7 @@ export async function buildAndSignTx(params: {
       maxPriorityFeePerGas,
       data: (params.data ?? "0x") as Hex,
     };
-  } catch {
-    const gasPrice = await client.getGasPrice();
-    const gasPriceBuffered = (gasPrice * GAS_FEE_BUFFER_MULTIPLIER) / GAS_FEE_BUFFER_DIVISOR;
+  } else if (params.gasPrice != null) {
     tx = {
       type: "legacy",
       nonce,
@@ -84,9 +98,41 @@ export async function buildAndSignTx(params: {
       to,
       value: params.valueWei,
       gas,
-      gasPrice: gasPriceBuffered,
+      gasPrice: params.gasPrice,
       data: (params.data ?? "0x") as Hex,
     };
+  } else {
+    try {
+      const fees = await client.estimateFeesPerGas();
+      const maxFeePerGas =
+        (fees.maxFeePerGas * GAS_FEE_BUFFER_MULTIPLIER) / GAS_FEE_BUFFER_DIVISOR;
+      const maxPriorityFeePerGas =
+        (fees.maxPriorityFeePerGas * GAS_FEE_BUFFER_MULTIPLIER) / GAS_FEE_BUFFER_DIVISOR;
+      tx = {
+        type: "eip1559",
+        nonce,
+        chainId: params.chainId,
+        to,
+        value: params.valueWei,
+        gas,
+        maxFeePerGas,
+        maxPriorityFeePerGas,
+        data: (params.data ?? "0x") as Hex,
+      };
+    } catch {
+      const gasPrice = await client.getGasPrice();
+      const gasPriceBuffered = (gasPrice * GAS_FEE_BUFFER_MULTIPLIER) / GAS_FEE_BUFFER_DIVISOR;
+      tx = {
+        type: "legacy",
+        nonce,
+        chainId: params.chainId,
+        to,
+        value: params.valueWei,
+        gas,
+        gasPrice: gasPriceBuffered,
+        data: (params.data ?? "0x") as Hex,
+      };
+    }
   }
 
   const signedHex = await account.signTransaction(tx);

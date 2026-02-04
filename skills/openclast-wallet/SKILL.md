@@ -74,6 +74,10 @@ Wallet creation is safe: `wallet_create` returns address metadata only (no keys)
 - Avalanche: `43114`
 - Binance Smart Chain: `56`
 
+Token address reference:
+- See `skills/openclast-wallet/TOKENS.md` for common token addresses.
+- Always verify addresses before sending.
+
 When the user says “balance on Sepolia” or “send on Ethereum,” always map to a chainId and proceed.
 
 ## Safety defaults

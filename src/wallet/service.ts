@@ -76,6 +76,11 @@ export type WalletService = {
     to: string;
     valueWei?: string;
     data: string;
+    gasLimit?: string;
+    gasPrice?: string;
+    maxFeePerGas?: string;
+    maxPriorityFeePerGas?: string;
+    nonce?: number;
   }): Promise<{ txId: string; pending: PendingTx }>;
   approveTx(txId: string): Promise<{ txHash: string; chainId: number } | { error: string }>;
   getPendingTx(txId: string): Promise<PendingTx | null>;
@@ -373,6 +378,11 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     to: string;
     valueWei?: string;
     data: string;
+    gasLimit?: string;
+    gasPrice?: string;
+    maxFeePerGas?: string;
+    maxPriorityFeePerGas?: string;
+    nonce?: number;
   }): Promise<{ txId: string; pending: PendingTx }> {
     const to = params.to.trim();
     if (!to.startsWith("0x") || to.length !== 42) {
@@ -395,6 +405,30 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     if (valueBigInt < 0n) throw new Error("valueWei must be non-negative");
     const data = (params.data ?? "").trim();
     if (!data.startsWith("0x")) throw new Error("data must be hex (0x...)");
+    const gasLimit = params.gasLimit?.trim();
+    if (gasLimit != null && gasLimit !== "") {
+      const gasLimitBigInt = BigInt(gasLimit);
+      if (gasLimitBigInt <= 0n) throw new Error("gasLimit must be positive");
+    }
+    const gasPrice = params.gasPrice?.trim();
+    if (gasPrice != null && gasPrice !== "") {
+      const gasPriceBigInt = BigInt(gasPrice);
+      if (gasPriceBigInt <= 0n) throw new Error("gasPrice must be positive");
+    }
+    const maxFeePerGas = params.maxFeePerGas?.trim();
+    if (maxFeePerGas != null && maxFeePerGas !== "") {
+      const maxFeePerGasBigInt = BigInt(maxFeePerGas);
+      if (maxFeePerGasBigInt <= 0n) throw new Error("maxFeePerGas must be positive");
+    }
+    const maxPriorityFeePerGas = params.maxPriorityFeePerGas?.trim();
+    if (maxPriorityFeePerGas != null && maxPriorityFeePerGas !== "") {
+      const maxPriorityFeePerGasBigInt = BigInt(maxPriorityFeePerGas);
+      if (maxPriorityFeePerGasBigInt <= 0n) throw new Error("maxPriorityFeePerGas must be positive");
+    }
+    const nonce = params.nonce;
+    if (nonce != null && (!Number.isInteger(nonce) || nonce < 0)) {
+      throw new Error("nonce must be a non-negative integer");
+    }
     if (limits?.allowedChains != null && limits.allowedChains.length > 0) {
       if (!limits.allowedChains.includes(chainId)) {
         throw new Error("Chain " + chainId + " not allowed (allowedChains)");
@@ -429,6 +463,11 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
       to,
       valueWei,
       data,
+      ...(gasLimit ? { gasLimit } : {}),
+      ...(gasPrice ? { gasPrice } : {}),
+      ...(maxFeePerGas ? { maxFeePerGas } : {}),
+      ...(maxPriorityFeePerGas ? { maxPriorityFeePerGas } : {}),
+      ...(nonce != null ? { nonce } : {}),
       createdAt: Date.now(),
       status: "pending",
     };
@@ -455,14 +494,21 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     }
     const rpc = getRpc(pending.chainId);
     try {
-      const { signedHex } = await buildAndSignTx({
+      const txParams = {
         privateKeyHex: privateKey,
         chainId: pending.chainId,
         to: pending.to,
         valueWei: BigInt(pending.valueWei),
         data: pending.data,
+        gasLimit: pending.gasLimit != null ? BigInt(pending.gasLimit) : undefined,
+        gasPrice: pending.gasPrice != null ? BigInt(pending.gasPrice) : undefined,
+        maxFeePerGas: pending.maxFeePerGas != null ? BigInt(pending.maxFeePerGas) : undefined,
+        maxPriorityFeePerGas:
+          pending.maxPriorityFeePerGas != null ? BigInt(pending.maxPriorityFeePerGas) : undefined,
+        nonce: pending.nonce,
         rpc,
-      });
+      };
+      const { signedHex } = await buildAndSignTx(txParams);
       const txHash = await rpc.sendRawTransaction(signedHex);
       await pendingStore.update(txId, { status: "sent", txHash });
       if (limits?.dailyLimit != null && limits.dailyLimit.trim() !== "") {
