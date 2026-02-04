@@ -30,6 +30,12 @@ Always:
 
 If the user asks to “just send,” still require approval unless config is explicitly set to auto mode.
 
+Status semantics:
+- `pending`: waiting for user approval; **not** broadcast yet.
+- `sent`: broadcast to the network; may still be unconfirmed.
+- `failed`: signing or broadcast failed.
+- `rejected`: approval was declined.
+
 ## Key export warning (mandatory)
 
 Never expose private keys by default. If the user asks for export:

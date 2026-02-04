@@ -347,7 +347,7 @@ const walletPlugin = {
     api.registerTool({
       name: "wallet_txStatus",
       label: "Wallet Transaction Status",
-      description: "Get the current status of a pending transaction.",
+      description: "Get the status of a pending transaction (pending=awaiting approval).",
       parameters: walletTxStatusSchema,
       execute: withErrors(async (params) => {
         const svc = ensureService();
@@ -356,9 +356,29 @@ const walletPlugin = {
         if (!pending) {
           return { found: false };
         }
+        const statusLabel = pending.status === "pending" ? "awaiting approval" : pending.status;
+        let statusNote: string | undefined;
+        switch (pending.status) {
+          case "pending":
+            statusNote = "Pending means awaiting user approval; it has not been broadcast.";
+            break;
+          case "sent":
+            statusNote = "Sent means broadcast to the network; it may still be unconfirmed.";
+            break;
+          case "failed":
+            statusNote = "Failed means signing or broadcast failed.";
+            break;
+          case "rejected":
+            statusNote = "Rejected means the pending transaction was declined.";
+            break;
+          default:
+            statusNote = undefined;
+        }
         return {
           found: true,
           pending,
+          statusLabel,
+          statusNote,
           explorerUrl:
             pending.txHash != null
               ? getBlockExplorerTxUrl(config, pending.chainId, pending.txHash)
