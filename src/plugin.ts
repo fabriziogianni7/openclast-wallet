@@ -70,6 +70,8 @@ const walletBalanceSchema = Type.Object({
   includeTokens: Type.Optional(Type.Boolean({ description: "Include known ERC20 balances" })),
 });
 
+const walletCreateSchema = Type.Object({});
+
 const walletListSchema = Type.Object({});
 
 const walletSendSchema = Type.Object({
@@ -197,6 +199,23 @@ const walletPlugin = {
           balanceWei: balance.toString(),
           tokens,
           explorerUrl: getBlockExplorerAddressUrl(config, chainId, address),
+        };
+      }),
+    });
+
+    api.registerTool({
+      name: "wallet_create",
+      label: "Wallet Create",
+      description: "Create a new wallet (address only; keys are never exposed).",
+      parameters: walletCreateSchema,
+      execute: withErrors(async () => {
+        const svc = ensureService();
+        const meta = await svc.createWallet();
+        return {
+          walletId: meta.walletId,
+          address: meta.address,
+          chainId: meta.chainId,
+          createdAt: meta.createdAt,
         };
       }),
     });

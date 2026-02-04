@@ -6,6 +6,7 @@
 
 import { execSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { privateKeyToAddress } from "./tx-builder.js";
 
 const WALLET_KEYCHAIN_SERVICE = "Moltbot Wallet";
 const WALLET_KEYCHAIN_ACCOUNT_PREFIX = "wallet:";
@@ -20,12 +21,6 @@ export type KeychainAdapter = {
 function generatePrivateKey(): string {
   const bytes = randomBytes(32);
   return "0x" + bytes.toString("hex");
-}
-
-function walletIdFromPrivateKey(privateKeyHex: string): string {
-  const normalized = privateKeyHex.replace(/^0x/, "").toLowerCase();
-  if (normalized.length !== 64) throw new Error("Invalid private key length");
-  return "0x" + normalized.slice(0, 16);
 }
 
 function keychainAccount(walletId: string): string {
@@ -77,14 +72,14 @@ export function createKeychainAdapter(platform: NodeJS.Platform = process.platfo
     return {
       createWallet(): { walletId: string; privateKeyHex: string } {
         const privateKeyHex = generatePrivateKey();
-        const walletId = walletIdFromPrivateKey(privateKeyHex);
+        const walletId = privateKeyToAddress(privateKeyHex);
         darwinSetPassword(WALLET_KEYCHAIN_SERVICE, keychainAccount(walletId), privateKeyHex);
         return { walletId, privateKeyHex };
       },
       importWallet(privateKeyHex: string): { walletId: string } {
         const normalized = privateKeyHex.replace(/^0x/, "").toLowerCase();
         if (normalized.length !== 64) throw new Error("Invalid private key length");
-        const walletId = "0x" + normalized.slice(0, 16);
+        const walletId = privateKeyToAddress("0x" + normalized);
         darwinSetPassword(WALLET_KEYCHAIN_SERVICE, keychainAccount(walletId), "0x" + normalized);
         return { walletId };
       },

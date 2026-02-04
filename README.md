@@ -71,6 +71,7 @@ Tools exposed by the plugin:
 
 - `wallet_address`
 - `wallet_balance`
+- `wallet_create`
 - `wallet_list`
 - `wallet_send`
 - `wallet_txStatus`
