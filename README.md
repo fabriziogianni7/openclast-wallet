@@ -19,37 +19,7 @@ openclaw plugins update openclast-wallet
 
 Then add config under `plugins.entries.openclast-wallet.config` and restart the Gateway:
 
-```json
-{
-  "plugins": {
-    "entries": {
-      "openclast-wallet": {
-        "enabled": true,
-        "config": {
-          "wallets": {
-            "autoCreateOnStartup": true,
-            "chains": {
-              "sepolia": { "rpcUrl": "https://rpc.sepolia.org" },
-              "1": {
-                "rpcUrl": "https://eth.llamarpc.com",
-                "blockExplorerUrl": "https://etherscan.io"
-              }
-            },
-            "defaults": {
-              "spending": {
-                "limitPerTx": "1000000000000000000",
-                "dailyLimit": "5000000000000000000"
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-```
-
-You can also point the plugin at an external config file (the plugin will read the JSON at startup):
+Point the plugin at an external config file (the plugin will read the JSON at startup):
 
 ```json
 {
@@ -64,6 +34,35 @@ You can also point the plugin at an external config file (the plugin will read t
     }
   }
 }
+```
+
+This is how the config file looks like:
+
+```json
+{
+  "wallets": {
+    "autoCreateOnStartup": true,
+    "chains": {
+      "1": {
+        "rpcUrl": "https://eth.llamarpc.com",
+        "blockExplorerUrl": "https://etherscan.io"
+      },
+     "42161": {
+        "rpcUrl": "https://arb1.arbitrum.io/rpc",
+        "blockExplorerUrl": "https://arbiscan.io"
+      }
+     // other chain confif
+    },
+    "defaults": {
+      "spending": {
+        "limitPerTx": "1000000000000000000",
+        "dailyLimit": "5000000000000000000"
+      }
+    },
+    "notify": { "primaryChannel": "telegram" }
+  }
+}
+// see other config options below
 ```
 
 Tools exposed by the plugin:
@@ -119,16 +118,6 @@ openclast-wallet restore --config ./wallet-config.json --mnemonic-file ./seed.tx
 ### State directory
 
 By default the package uses `resolveStateDir()` which reads `MOLTBOT_STATE_DIR` or `CLAWDBOT_STATE_DIR`, or falls back to `~/.moltbot` / `~/.clawdbot`. Wallets and pending tx state live under `<stateDir>/wallets/`.
-
-### API overview
-
-- **createWalletService(config)** — build service from explicit `WalletServiceConfig` (stateDir, chains, defaultChainId, limits, etc.).
-- **createWalletServiceFromConfig(cfg)** — build service from `WalletIntegrationConfig`; uses default Sepolia if no chains are set.
-- **resolveWalletChains(cfg)**, **resolveDefaultChainId(cfg)**, **resolveWalletChainConfig(cfg, chainId)** — derive chain config from `WalletIntegrationConfig`.
-- **resolveWalletChainConfigForBalance(cfg, chainId)** — chain config for read-only use (config + well-known public RPCs).
-- **getBlockExplorerTxUrl(cfg, chainId, txHash)**, **getBlockExplorerAddressUrl(cfg, chainId, address)** — block explorer URLs.
-- **WalletService** — ensureDefaultWallet, createWallet, importWallet, recoverFromMnemonic, getAddress, getDefaultWalletId, listWallets, setDefaultWallet, getPrivateKey, requestSend, requestErc20Approve, requestErc20Transfer, requestContractCall, approveTx, getPendingTx, listPending.
-
 
 ### Config shape
 
@@ -197,79 +186,6 @@ The package ships an agent skill at `skills/openclast-wallet/SKILL.md`. It is co
 
 ```bash
 openclast-wallet install-skill
-```
-
-## LLM Quick Guide
-
-Use the steps below when instructing an LLM to install and set up the wallet.
-
-### 1) Install
-
-```bash
-npm install openclast-wallet
-```
-
-### 2) Configure
-
-Create a JSON config file (for example `wallet-config.json`) that includes a `wallets` section. Keep it separate from `openclaw.json` and pass it to the CLI. You can start from the packaged `wallet-config.json` or generate one with `openclast-wallet init`.
-
-```json
-{
-  "wallets": {
-    "autoCreateOnStartup": true,
-    "chains": {
-      "sepolia": { "rpcUrl": "https://rpc.sepolia.org" },
-      "1": { "rpcUrl": "https://eth.llamarpc.com", "blockExplorerUrl": "https://etherscan.io" }
-    },
-    "defaults": {
-      "spending": {
-        "limitPerTx": "1000000000000000000",
-        "dailyLimit": "5000000000000000000"
-      }
-    },
-    "notify": { "primaryChannel": "slack" }
-  }
-}
-```
-
-### 3) Setup wallet
-
-```bash
-openclast-wallet init --config ./wallet-config.json
-```
-
-You can also generate a starter config with:
-
-```bash
-openclast-wallet init
-```
-
-### 3b) Install agent skill (optional)
-
-```bash
-openclast-wallet install-skill
-```
-
-### 3c) Create / export / restore
-
-```bash
-openclast-wallet create --config ./wallet-config.json
-openclast-wallet list --config ./wallet-config.json
-openclast-wallet set-default <walletId> --config ./wallet-config.json
-MOLTBOT_ALLOW_WALLET_EXPORT=1 openclast-wallet export --config ./wallet-config.json --yes
-openclast-wallet restore --config ./wallet-config.json --private-key 0x...
-```
-
-### 4) Use normally
-
-```ts
-import { createWalletServiceFromConfig } from "openclast-wallet";
-
-const service = createWalletServiceFromConfig(config);
-if (service) {
-  await service.ensureDefaultWallet();
-  const address = await service.getAddress();
-}
 ```
 
 ## License
