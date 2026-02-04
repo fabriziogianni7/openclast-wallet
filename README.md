@@ -190,6 +190,14 @@ The package ships an agent skill at `skills/openclast-wallet/SKILL.md`. It is co
 openclast-wallet install-skill
 ```
 
+## Contributing
+
+- Fork the repo and create a feature branch.
+- Install dependencies with `pnpm install`.
+- Make changes with small, focused commits.
+- Run relevant checks/tests before opening a PR.
+- Open a PR with a clear description and repro steps if fixing a bug.
+
 ## License
 
 MIT
