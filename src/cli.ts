@@ -13,9 +13,10 @@ function printUsage(): void {
       "openclast-wallet",
       "",
       "Usage:",
-      "  openclast-wallet setup [--config <path>]",
       "  openclast-wallet init [--config <path>]",
       "  openclast-wallet create [--config <path>]",
+      "  openclast-wallet list [--config <path>]",
+      "  openclast-wallet set-default <walletId> [--config <path>]",
       "  openclast-wallet export [--config <path>] --yes",
       "  openclast-wallet restore [--config <path>] [--private-key <hex> | --mnemonic <words> | --mnemonic-file <path>] [--account-index <n>]",
       "  openclast-wallet install-skill",
@@ -271,9 +272,10 @@ async function run(): Promise<void> {
 
   const command = args[0];
   if (
-    command !== "setup" &&
     command !== "init" &&
     command !== "create" &&
+    command !== "list" &&
+    command !== "set-default" &&
     command !== "export" &&
     command !== "restore" &&
     command !== "install-skill"
@@ -291,7 +293,7 @@ async function run(): Promise<void> {
 
   try {
     const configPath = readFlag(args, "--config", "-c");
-    if (command === "setup" || command === "init") {
+    if (command === "init") {
       if (configPath && configPath.startsWith("@")) {
         const targetPath = configPath.slice(1) || "wallet-config.json";
         if (await fileExists(targetPath)) {
@@ -337,6 +339,32 @@ async function run(): Promise<void> {
     if (command === "create") {
       const meta = await service.createWallet();
       console.log(`Wallet created: ${meta.address} (${meta.walletId})`);
+      return;
+    }
+
+    if (command === "list") {
+      const { wallets, defaultWalletId } = await service.listWallets();
+      if (wallets.length === 0) {
+        console.log("No wallets found.");
+        return;
+      }
+      for (const wallet of wallets) {
+        const isDefault = wallet.walletId === defaultWalletId;
+        const label = `${wallet.address} (${wallet.walletId}) chain ${wallet.chainId}`;
+        console.log(`${label}${isDefault ? " [default]" : ""}`);
+      }
+      return;
+    }
+
+    if (command === "set-default") {
+      const walletId = args[1];
+      if (!walletId || walletId.startsWith("-")) {
+        console.error("Usage: openclast-wallet set-default <walletId>");
+        process.exitCode = 1;
+        return;
+      }
+      const meta = await service.setDefaultWallet(walletId);
+      console.log(`Default wallet set: ${meta.address} (${meta.walletId})`);
       return;
     }
 

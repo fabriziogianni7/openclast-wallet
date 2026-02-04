@@ -47,6 +47,8 @@ export type WalletService = {
   recoverFromMnemonic(mnemonic: string, accountIndex?: number): Promise<WalletMeta>;
   getAddress(walletId?: string): Promise<string | null>;
   getDefaultWalletId(): Promise<string | null>;
+  listWallets(): Promise<{ defaultWalletId: string | null; wallets: WalletMeta[] }>;
+  setDefaultWallet(walletId: string): Promise<WalletMeta>;
   getPrivateKey(walletId?: string): Promise<string | null>;
   requestSend(params: {
     walletId?: string;
@@ -105,6 +107,22 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
   async function getDefaultWalletId(): Promise<string | null> {
     const state = await stateStore.load();
     return state.defaultWalletId;
+  }
+
+  async function listWallets(): Promise<{ defaultWalletId: string | null; wallets: WalletMeta[] }> {
+    const state = await stateStore.load();
+    const wallets = Object.values(state.wallets).sort((a, b) => a.createdAt - b.createdAt);
+    return { defaultWalletId: state.defaultWalletId, wallets };
+  }
+
+  async function setDefaultWallet(walletId: string): Promise<WalletMeta> {
+    const state = await stateStore.load();
+    const meta = state.wallets[walletId];
+    if (!meta) throw new Error("Wallet not found");
+    state.defaultWalletId = walletId;
+    await stateStore.save(state);
+    await audit.append({ action: "wallet_default_set", walletId, chainId: meta.chainId });
+    return meta;
   }
 
   async function createWallet(): Promise<WalletMeta> {
@@ -492,6 +510,8 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     recoverFromMnemonic,
     getAddress,
     getDefaultWalletId,
+    listWallets,
+    setDefaultWallet,
     getPrivateKey,
     requestSend,
     requestErc20Approve,

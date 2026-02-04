@@ -1,4 +1,5 @@
 import { Type } from "@sinclair/typebox";
+import fs from "node:fs";
 import { jsonResult } from "openclaw/plugin-sdk";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import {
@@ -20,9 +21,22 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
+function loadConfigFromPath(filePath: string): PluginConfig {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const parsed = JSON.parse(raw) as unknown;
+  return normalizePluginConfig(parsed);
+}
+
 function normalizePluginConfig(value: unknown): PluginConfig {
+  if (typeof value === "string") {
+    return loadConfigFromPath(value);
+  }
   if (!isObject(value)) {
     return {};
+  }
+  const maybeConfigPath = value["configPath"];
+  if (typeof maybeConfigPath === "string") {
+    return loadConfigFromPath(maybeConfigPath);
   }
   if ("wallets" in value) {
     return value as PluginConfig;
@@ -55,6 +69,8 @@ const walletBalanceSchema = Type.Object({
   chainId: Type.Optional(Type.Number({ description: "Chain id for balance" })),
   includeTokens: Type.Optional(Type.Boolean({ description: "Include known ERC20 balances" })),
 });
+
+const walletListSchema = Type.Object({});
 
 const walletSendSchema = Type.Object({
   walletId: Type.Optional(Type.String({ description: "Wallet id override" })),
@@ -93,6 +109,10 @@ const walletContractCallSchema = Type.Object({
   to: Type.String({ description: "Contract address (0x...)" }),
   valueWei: Type.Optional(Type.String({ description: "ETH value in wei" })),
   data: Type.String({ description: "Calldata (0x...)" }),
+});
+
+const walletSetDefaultSchema = Type.Object({
+  walletId: Type.String({ description: "Wallet id to set as default" }),
 });
 
 const walletPlugin = {
@@ -177,6 +197,45 @@ const walletPlugin = {
           balanceWei: balance.toString(),
           tokens,
           explorerUrl: getBlockExplorerAddressUrl(config, chainId, address),
+        };
+      }),
+    });
+
+    api.registerTool({
+      name: "wallet_list",
+      label: "Wallet List",
+      description: "List known wallets and the current default wallet.",
+      parameters: walletListSchema,
+      execute: withErrors(async () => {
+        const svc = ensureService();
+        const { wallets, defaultWalletId } = await svc.listWallets();
+        return {
+          defaultWalletId,
+          wallets: wallets.map((wallet) => ({
+            ...wallet,
+            isDefault: wallet.walletId === defaultWalletId,
+          })),
+        };
+      }),
+    });
+
+    api.registerTool({
+      name: "wallet_setDefault",
+      label: "Wallet Set Default",
+      description: "Set the default wallet by id.",
+      parameters: walletSetDefaultSchema,
+      execute: withErrors(async (params) => {
+        const svc = ensureService();
+        const walletId = typeof params.walletId === "string" ? params.walletId : "";
+        if (!walletId) {
+          throw new Error("walletId is required");
+        }
+        const meta = await svc.setDefaultWallet(walletId);
+        return {
+          walletId: meta.walletId,
+          address: meta.address,
+          chainId: meta.chainId,
+          createdAt: meta.createdAt,
         };
       }),
     });

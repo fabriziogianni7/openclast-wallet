@@ -50,13 +50,32 @@ Then add config under `plugins.entries.openclast-wallet.config` and restart the 
 }
 ```
 
+You can also point the plugin at an external config file (the plugin will read the JSON at startup):
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclast-wallet": {
+        "enabled": true,
+        "config": {
+          "configPath": "/absolute/path/to/wallet-config.json"
+        }
+      }
+    }
+  }
+}
+```
+
 Tools exposed by the plugin:
 
 - `wallet_address`
 - `wallet_balance`
+- `wallet_list`
 - `wallet_send`
 - `wallet_txStatus`
 - `wallet_approve`
+- `wallet_setDefault`
 - `wallet_erc20_approve`
 - `wallet_erc20_transfer`
 - `wallet_contract_call`
@@ -68,18 +87,22 @@ Tools exposed by the plugin:
 Initialize a wallet from a JSON config you create (e.g. `wallet-config.json`). A starter `wallet-config.json` ships with the package. Keep this file separate from `openclaw.json` (Openclaw config does not accept a top-level `wallets` key).
 
 ```bash
-openclast-wallet setup --config ./wallet-config.json
-# or
 openclast-wallet init --config ./wallet-config.json
 
 # create a starter config in the current folder
-openclast-wallet setup
+openclast-wallet init
 
 # install agent skill into ./skills/openclast-wallet
 openclast-wallet install-skill
 
 # create a new wallet entry (defaults to ./wallet-config.json if --config omitted)
 openclast-wallet create --config ./wallet-config.json
+
+# list known wallets (marks default)
+openclast-wallet list --config ./wallet-config.json
+
+# set a default wallet by id
+openclast-wallet set-default <walletId> --config ./wallet-config.json
 
 # export private key (requires confirmation + env gate; defaults to ./wallet-config.json if --config omitted)
 MOLTBOT_ALLOW_WALLET_EXPORT=1 openclast-wallet export --config ./wallet-config.json --yes
@@ -104,7 +127,7 @@ By default the package uses `resolveStateDir()` which reads `MOLTBOT_STATE_DIR` 
 - **resolveWalletChains(cfg)**, **resolveDefaultChainId(cfg)**, **resolveWalletChainConfig(cfg, chainId)** — derive chain config from `WalletIntegrationConfig`.
 - **resolveWalletChainConfigForBalance(cfg, chainId)** — chain config for read-only use (config + well-known public RPCs).
 - **getBlockExplorerTxUrl(cfg, chainId, txHash)**, **getBlockExplorerAddressUrl(cfg, chainId, address)** — block explorer URLs.
-- **WalletService** — ensureDefaultWallet, createWallet, importWallet, recoverFromMnemonic, getAddress, getDefaultWalletId, getPrivateKey, requestSend, requestErc20Approve, requestErc20Transfer, requestContractCall, approveTx, getPendingTx, listPending.
+- **WalletService** — ensureDefaultWallet, createWallet, importWallet, recoverFromMnemonic, getAddress, getDefaultWalletId, listWallets, setDefaultWallet, getPrivateKey, requestSend, requestErc20Approve, requestErc20Transfer, requestContractCall, approveTx, getPendingTx, listPending.
 
 
 ### Config shape
@@ -164,7 +187,7 @@ npm install openclast-wallet
 
 ### 2) Configure
 
-Create a JSON config file (for example `wallet-config.json`) that includes a `wallets` section. Keep it separate from `openclaw.json` and pass it to the CLI. You can start from the packaged `wallet-config.json` or generate one with `openclast-wallet setup`.
+Create a JSON config file (for example `wallet-config.json`) that includes a `wallets` section. Keep it separate from `openclaw.json` and pass it to the CLI. You can start from the packaged `wallet-config.json` or generate one with `openclast-wallet init`.
 
 ```json
 {
@@ -188,13 +211,13 @@ Create a JSON config file (for example `wallet-config.json`) that includes a `wa
 ### 3) Setup wallet
 
 ```bash
-openclast-wallet setup --config ./wallet-config.json
+openclast-wallet init --config ./wallet-config.json
 ```
 
 You can also generate a starter config with:
 
 ```bash
-openclast-wallet setup
+openclast-wallet init
 ```
 
 ### 3b) Install agent skill (optional)
@@ -207,6 +230,8 @@ openclast-wallet install-skill
 
 ```bash
 openclast-wallet create --config ./wallet-config.json
+openclast-wallet list --config ./wallet-config.json
+openclast-wallet set-default <walletId> --config ./wallet-config.json
 MOLTBOT_ALLOW_WALLET_EXPORT=1 openclast-wallet export --config ./wallet-config.json --yes
 openclast-wallet restore --config ./wallet-config.json --private-key 0x...
 ```
