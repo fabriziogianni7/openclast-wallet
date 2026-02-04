@@ -84,7 +84,7 @@ Tools exposed by the plugin:
 
 ### CLI
 
-Initialize a wallet from a JSON config you create (e.g. `wallet-config.json`). A starter `wallet-config.json` ships with the package. Keep this file separate from `openclaw.json` (Openclaw config does not accept a top-level `wallets` key).
+Initialize a wallet from a JSON config you create (e.g. `wallet-config.json`). A starter `wallet-config.json` ships with the package.
 
 ```bash
 openclast-wallet init --config ./wallet-config.json
