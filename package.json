@@ -1,6 +1,6 @@
 {
   "name": "openclast-wallet",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Native wallet pluginfor Openclaw",
   "type": "module",
   "main": "./dist/index.js",
