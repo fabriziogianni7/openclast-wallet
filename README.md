@@ -2,20 +2,19 @@
 
 Native custodial EVM wallet for [openclaw](https://openclaw.ai/): OS keychain (macOS), configurable chains, notify-and-approve flow. Built with [viem](https://viem.sh).
 
-## Install
-
-```bash
-pnpm add openclast-wallet
-# or
-npm install openclast-wallet
-```
 
 ## OpenClaw plugin install
 
-If you want OpenClaw to discover this wallet as a plugin:
+Install the plugin on openclaw:
 
 ```bash
 openclaw plugins install openclast-wallet
+```
+
+For updating the plugin:
+
+```bash
+openclaw plugins update openclast-wallet
 ```
 
 Then add config under `plugins.entries.openclast-wallet.config` and restart the Gateway:
@@ -162,6 +161,30 @@ if (service) {
   // requestSend, approveTx, getPendingTx, etc.
 }
 ```
+
+### Config settings reference
+
+| Path | Type | Default | Description |
+| --- | --- | --- | --- |
+| `wallets.autoCreateOnStartup` | boolean | `true` (in wizard) | Auto-create a wallet on startup if none exists. |
+| `wallets.interactWithUnverifiedContracts` | boolean | `true` | Allow contract calls to unverified addresses when `false` requires verified allowlists. |
+| `wallets.chains` | object | `{}` | Map of chain IDs or names to RPC and explorer settings. |
+| `wallets.chains.<chainId>.rpcUrl` | string | `""` | RPC endpoint for the chain. Required for writes. |
+| `wallets.chains.<chainId>.blockExplorerUrl` | string | `""` | Base explorer URL for tx/address links. |
+| `wallets.defaults.spending.mode` | `"notify" \| "auto"` | `"notify"` | Approval mode: `notify` creates pending tx, `auto` sends immediately. |
+| `wallets.defaults.spending.limitPerTx` | string (wei) | `""` | Per-transaction max (wei). Empty disables. |
+| `wallets.defaults.spending.dailyLimit` | string (wei) | `""` | Daily spend max (wei). Empty disables. |
+| `wallets.defaults.spending.allowedChains` | number[] | `[]` | Restrict sends/calls to specific chain IDs. |
+| `wallets.defaults.spending.allowedRecipients` | string[] | `[]` | Restrict sends/calls to specific recipient addresses. |
+| `wallets.defaults.spending.notifyChannels` | string[] | `[]` | Channels to notify for approvals (if applicable). |
+| `wallets.defaults.verifiedTokenAddresses` | string[] | `[]` | ERC20 allowlist when unverified contracts are blocked. |
+| `wallets.defaults.verifiedContractAddresses` | string[] | `[]` | Contract allowlist when unverified contracts are blocked. |
+| `wallets.notify.primaryChannel` | string | `""` | Primary notify channel for approvals. |
+
+Notes:
+- Chain keys may be numeric strings (e.g. `"8453"`) or aliases like `"sepolia"`.
+- Read-only balance queries can use well-known public RPCs even if a chain is not configured.
+- Addresses are chain-agnostic; chainId only selects RPC/explorer for the request.
 
 ### Important Note
 
