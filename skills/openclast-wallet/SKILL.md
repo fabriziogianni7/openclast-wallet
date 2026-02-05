@@ -12,11 +12,20 @@ metadata:
 
 # Openclast Wallet Guide
 
-## Quick start
+## Exposed tools
+  - `wallet_address` — get default wallet address (or by walletId)
+  - `wallet_balance` — get native balance (optionally ERC‑20 balances)
+  - `wallet_create` — create a new wallet
+  - `wallet_list` — list wallets + default
+  - `wallet_setDefault` — set default wallet
+  - `wallet_send` — create pending native send
+  - `wallet_erc20_approve` — create pending ERC‑20 approve
+  - `wallet_erc20_transfer` — create pending ERC‑20 transfer
+  - `wallet_contract_call` — create pending contract call
+  - `wallet_txStatus` — get pending tx status
+  - `wallet_approve` — approve + broadcast pending tx
 
-- Use the CLI to bootstrap:
-  - `openclast-wallet init` creates `wallet-config.json` in the current folder.
-  - `openclast-wallet init --config ./wallet-config.json` initializes the wallet from that file.
+## Config
 - Prefer `wallet-config.json` in the project root and customize chains and limits before use.
 - Keep `wallet-config.json` separate from `openclaw.json` (Openclaw config does not accept a top-level `wallets` key).
 
@@ -28,7 +37,7 @@ Always:
 2. Ask the user to approve.
 3. Only after approval, broadcast and confirm.
 
-If the user asks to “just send,” still require approval unless config is explicitly set to auto mode.
+If the user asks to “just send,” send that transaction without asking for approval again, and give a recap of the transaction.
 
 Status semantics:
 - `pending`: waiting for user approval; **not** broadcast yet.
@@ -50,7 +59,7 @@ Wallet creation is safe: `wallet_create` returns address metadata only (no keys)
 
 ### Balance and tokens
 - EVM wallet addresses are chain-agnostic; do not ask to switch wallets for a balance check.
-- Use the correct chainId for the chain the user mentions.
+- when a user asks for a balance, use the `wallet_balance` tool to get the balance and check all the configuredchains.
 - If multiple wallets exist and the user does not specify one, use the default wallet.
 - If a chain is not configured, read-only balance may still be possible via well-known public RPCs.
 
@@ -74,16 +83,15 @@ Wallet creation is safe: `wallet_create` returns address metadata only (no keys)
 - Avalanche: `43114`
 - Binance Smart Chain: `56`
 
+Use Sepolia only if specified by the user.
+
 Token address reference:
 - See `skills/openclast-wallet/TOKENS.md` for common token addresses.
 - Always verify addresses before sending.
 
-When the user says “balance on Sepolia” or “send on Ethereum,” always map to a chainId and proceed.
-
 ## Safety defaults
 
 - Default mode is notify/approval, not auto-send.
-- Restrict unverified contracts when possible.
 - Never export or display private keys.
 
 
@@ -102,23 +110,4 @@ After approval and broadcast, always include a tx link. Use:
 
 Base URL comes from `wallets.chains.<chainId>.blockExplorerUrl` when configured, otherwise fallback well-known explorers.
 
-## Agent tool expectations
-
-If host tooling is available, prefer these tools:
-- `wallet_create`, `wallet_send`, `wallet_balance`, `wallet_txStatus`, `wallet_approve`
-- `wallet_list`, `wallet_setDefault`
-- `wallet_erc20_approve`, `wallet_erc20_transfer`, `wallet_contract_call`
-
-If the host provides CLI instead, use the host wallet CLI for create/address/send/approve and recover/import flows.
-
-## Files and CLI
-
-- Starter config: `wallet-config.json`
-- Install skill in project: `openclast-wallet install-skill`
-- Initialize config: `openclast-wallet init` or `openclast-wallet init --config ./wallet-config.json`
-- Create wallet: `openclast-wallet create --config ./wallet-config.json` (defaults to `./wallet-config.json` if omitted)
-- List wallets: `openclast-wallet list --config ./wallet-config.json`
-- Set default wallet: `openclast-wallet set-default <walletId> --config ./wallet-config.json`
-- Export key (gated): `MOLTBOT_ALLOW_WALLET_EXPORT=1 openclast-wallet export --config ./wallet-config.json --yes` (defaults to `./wallet-config.json` if omitted)
-- Restore: `openclast-wallet restore --config ./wallet-config.json --private-key 0x...` or `--mnemonic "..."` / `--mnemonic-file <path>` (defaults to `./wallet-config.json` if omitted)
 

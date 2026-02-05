@@ -350,7 +350,7 @@ async function run(): Promise<void> {
       }
       for (const wallet of wallets) {
         const isDefault = wallet.walletId === defaultWalletId;
-        const label = `${wallet.address} (${wallet.walletId}) chain ${wallet.chainId}`;
+        const label = `${wallet.address} (${wallet.walletId}) type ${wallet.type}`;
         console.log(`${label}${isDefault ? " [default]" : ""}`);
       }
       return;
