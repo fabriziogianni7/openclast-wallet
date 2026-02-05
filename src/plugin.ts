@@ -587,7 +587,11 @@ const walletPlugin = {
       parameters: walletSendSchema,
       execute: withErrors(async (params) => {
         const svc = ensureService();
-        const to = typeof params.to === "string" ? params.to : "";
+        const rawTo = params.to;
+        if (typeof rawTo !== "string" || !rawTo.trim()) {
+          throw new Error(`Missing or invalid 'to' parameter (received type=${typeof rawTo}, value=${JSON.stringify(rawTo)})`);
+        }
+        const to = rawTo;
         const valueWei = parseHumanAmount(params, "valueWei");
         if (!valueWei) throw new Error("Either `valueWei` or `amount` is required");
         const chainId = typeof params.chainId === "number" ? params.chainId : undefined;

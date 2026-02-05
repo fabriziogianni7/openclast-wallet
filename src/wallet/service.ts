@@ -32,16 +32,22 @@ function isContractAllowed(
 /**
  * Validate and normalize an EVM address. Uses viem isAddress (EIP-55 aware).
  * Returns the checksummed address or throws.
+ * Sanitizes common LLM formatting artifacts (backticks, quotes, markdown).
  */
 function validateAddress(raw: string, label: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed.startsWith("0x") || trimmed.length !== 42) {
-    throw new Error(`Invalid ${label}: must be 42-char hex starting with 0x`);
+  // Strip common LLM formatting artifacts: backticks, quotes, markdown bold/italic
+  let sanitized = raw.trim().replace(/^[`'"*_]+|[`'"*_]+$/g, "").trim();
+  // Also strip any zero-width / invisible unicode characters
+  sanitized = sanitized.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "");
+  if (!sanitized.startsWith("0x") || sanitized.length !== 42) {
+    throw new Error(
+      `Invalid ${label}: must be 42-char hex starting with 0x (got ${sanitized.length} chars: "${sanitized.slice(0, 50)}")`,
+    );
   }
-  if (!isAddress(trimmed)) {
-    throw new Error(`Invalid ${label}: not a valid EVM address`);
+  if (!isAddress(sanitized)) {
+    throw new Error(`Invalid ${label}: not a valid EVM address ("${sanitized}")`);
   }
-  return getAddress(trimmed);
+  return getAddress(sanitized);
 }
 
 export type WalletServiceConfig = {
