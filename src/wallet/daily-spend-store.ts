@@ -39,8 +39,8 @@ export function createDailySpendStore(walletsDir: string): DailySpendStore {
   }
 
   async function save(record: DailySpendRecord): Promise<void> {
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, JSON.stringify(record, null, 2));
+    await fs.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+    await fs.writeFile(filePath, JSON.stringify(record, null, 2), { mode: 0o600 });
   }
 
   return {

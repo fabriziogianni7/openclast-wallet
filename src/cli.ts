@@ -3,7 +3,7 @@ import { copyFile, mkdir, readdir, readFile, stat, writeFile } from "node:fs/pro
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { createWalletServiceFromConfig } from "./wallet/index.js";
+import { createKeychainAdapter, createWalletServiceFromConfig } from "./wallet/index.js";
 
 type CliConfig = Record<string, unknown>;
 
@@ -18,7 +18,7 @@ function printUsage(): void {
       "  openclast-wallet list [--config <path>]",
       "  openclast-wallet set-default <walletId> [--config <path>]",
       "  openclast-wallet export [--config <path>] --yes",
-      "  openclast-wallet restore [--config <path>] [--private-key <hex> | --mnemonic <words> | --mnemonic-file <path>] [--account-index <n>]",
+      "  openclast-wallet restore [--config <path>] [--private-key <hex> | --private-key-file <path> | --mnemonic <words> | --mnemonic-file <path>] [--account-index <n>]",
       "  openclast-wallet install-skill",
       "",
       "Options:",
@@ -381,9 +381,16 @@ async function run(): Promise<void> {
         process.exitCode = 1;
         return;
       }
-      const privateKey = await service.getPrivateKey();
+      const defaultWalletId = await service.getDefaultWalletId();
+      if (!defaultWalletId) {
+        console.error("No default wallet found.");
+        process.exitCode = 1;
+        return;
+      }
+      const keychain = createKeychainAdapter();
+      const privateKey = keychain.getPrivateKey(defaultWalletId);
       if (!privateKey) {
-        console.error("No default wallet key found.");
+        console.error("No private key found for default wallet.");
         process.exitCode = 1;
         return;
       }
@@ -395,6 +402,7 @@ async function run(): Promise<void> {
 
     if (command === "restore") {
       const privateKeyHex = readFlag(args, "--private-key");
+      const privateKeyFile = readFlag(args, "--private-key-file");
       const mnemonic = readFlag(args, "--mnemonic");
       const mnemonicFile = readFlag(args, "--mnemonic-file");
       const accountIndexRaw = readFlag(args, "--account-index");
@@ -404,9 +412,23 @@ async function run(): Promise<void> {
         process.exitCode = 1;
         return;
       }
+      if (privateKeyHex) {
+        console.warn(
+          "WARNING: --private-key passes the key as a CLI argument visible in process lists.\n" +
+          "         Prefer --private-key-file <path> for safer import.",
+        );
+      }
       let meta = null as Awaited<ReturnType<typeof service.createWallet>> | null;
       if (privateKeyHex) {
         meta = await service.importWallet(privateKeyHex);
+      } else if (privateKeyFile) {
+        const keyFromFile = (await readFile(privateKeyFile, "utf8")).trim();
+        if (!keyFromFile) {
+          console.error("Private key file is empty.");
+          process.exitCode = 1;
+          return;
+        }
+        meta = await service.importWallet(keyFromFile);
       } else {
         let mnemonicValue = mnemonic;
         if (!mnemonicValue && mnemonicFile) {

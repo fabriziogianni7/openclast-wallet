@@ -32,8 +32,8 @@ export function createPendingStore(walletsDir: string): PendingStore {
   }
 
   async function save(items: PendingTx[]): Promise<void> {
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, JSON.stringify(items, null, 2));
+    await fs.mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+    await fs.writeFile(filePath, JSON.stringify(items, null, 2), { mode: 0o600 });
   }
 
   return {

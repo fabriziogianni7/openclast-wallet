@@ -4,6 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 
+import { getAddress, isAddress } from "viem";
 import { createKeychainAdapter } from "./keychain.js";
 import { createDailySpendStore, getTodayUtc } from "./daily-spend-store.js";
 import { encodeErc20Approve, encodeErc20Transfer } from "./erc20.js";
@@ -13,7 +14,7 @@ import { createStateStore } from "./state-store.js";
 import { buildAndSignTx, privateKeyToAddress } from "./tx-builder.js";
 import { mnemonicToPrivateKeyHex } from "./mnemonic.js";
 import type { PendingTx, WalletConfig, WalletMeta, WalletsLimits } from "./types.js";
-import { createAuditLog } from "./audit.js";
+import { createAuditLog, type AuditEntry, type AuditLogFilter } from "./audit.js";
 
 function isContractAllowed(
   address: string,
@@ -26,6 +27,21 @@ function isContractAllowed(
     ...(config.verifiedContractAddresses ?? []),
   ].map((a) => a.trim().toLowerCase());
   return verified.some((a) => a === normalized);
+}
+
+/**
+ * Validate and normalize an EVM address. Uses viem isAddress (EIP-55 aware).
+ * Returns the checksummed address or throws.
+ */
+function validateAddress(raw: string, label: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("0x") || trimmed.length !== 42) {
+    throw new Error(`Invalid ${label}: must be 42-char hex starting with 0x`);
+  }
+  if (!isAddress(trimmed)) {
+    throw new Error(`Invalid ${label}: not a valid EVM address`);
+  }
+  return getAddress(trimmed);
 }
 
 export type WalletServiceConfig = {
@@ -49,7 +65,6 @@ export type WalletService = {
   getDefaultWalletId(): Promise<string | null>;
   listWallets(): Promise<{ defaultWalletId: string | null; wallets: WalletMeta[] }>;
   setDefaultWallet(walletId: string): Promise<WalletMeta>;
-  getPrivateKey(walletId?: string): Promise<string | null>;
   requestSend(params: {
     walletId?: string;
     chainId?: number;
@@ -83,8 +98,10 @@ export type WalletService = {
     nonce?: number;
   }): Promise<{ txId: string; pending: PendingTx }>;
   approveTx(txId: string): Promise<{ txHash: string; chainId: number } | { error: string }>;
+  rejectTx(txId: string): Promise<{ ok: boolean; error?: string }>;
   getPendingTx(txId: string): Promise<PendingTx | null>;
   listPending(): Promise<PendingTx[]>;
+  queryHistory(filter?: AuditLogFilter): Promise<AuditEntry[]>;
 };
 
 export function createWalletService(config: WalletServiceConfig): WalletService {
@@ -97,6 +114,8 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
   const defaultChainId = config.defaultChainId;
   const limits = config.limits;
   const rpcByChain = new Map<number, RpcClient>();
+  /** Pending transactions expire after 30 minutes (ms). */
+  const PENDING_TX_TTL_MS = 30 * 60 * 1000;
 
   function getRpc(chainId: number): RpcClient {
     let rpc = rpcByChain.get(chainId);
@@ -177,13 +196,6 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     return meta?.address ?? null;
   }
 
-  async function getPrivateKey(walletId?: string): Promise<string | null> {
-    const state = await stateStore.load();
-    const id = walletId ?? state.defaultWalletId;
-    if (!id) return null;
-    return keychain.getPrivateKey(id);
-  }
-
   async function ensureDefaultWallet(): Promise<WalletMeta | null> {
     const state = await stateStore.load();
     if (state.defaultWalletId && state.wallets[state.defaultWalletId]) {
@@ -203,12 +215,9 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     if (!walletId) throw new Error("No default wallet");
     const meta = state.wallets[walletId];
     if (!meta) throw new Error("Wallet not found");
-    const privateKey = keychain.getPrivateKey(walletId);
-    if (!privateKey) throw new Error("Cannot read wallet key");
     const valueWei = BigInt(params.valueWei);
     if (valueWei <= 0n) throw new Error("Value must be positive");
-    const to = params.to.trim();
-    if (!to.startsWith("0x") || to.length !== 42) throw new Error("Invalid to address");
+    const to = validateAddress(params.to, "recipient address");
     const chainId = params.chainId ?? defaultChainId;
     if (!config.chains[chainId]) throw new Error(`Chain ${chainId} not configured`);
 
@@ -267,10 +276,7 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     spender: string;
     amountWei: string;
   }): Promise<{ txId: string; pending: PendingTx }> {
-    const tokenAddress = params.tokenAddress.trim();
-    if (!tokenAddress.startsWith("0x") || tokenAddress.length !== 42) {
-      throw new Error("Invalid token address");
-    }
+    const tokenAddress = validateAddress(params.tokenAddress, "token address");
     if (!isContractAllowed(tokenAddress, config)) {
       throw new Error("Token not in verifiedTokenAddresses (set interactWithUnverifiedContracts or add to list)");
     }
@@ -281,8 +287,7 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     if (!meta) throw new Error("Wallet not found");
     const chainId = params.chainId ?? defaultChainId;
     if (!config.chains[chainId]) throw new Error("Chain " + chainId + " not configured");
-    const spender = params.spender.trim();
-    if (!spender.startsWith("0x") || spender.length !== 42) throw new Error("Invalid spender address");
+    const spender = validateAddress(params.spender, "spender address");
     const amountWei = BigInt(params.amountWei);
     const data = encodeErc20Approve(spender, amountWei);
     const txId = randomUUID();
@@ -317,10 +322,7 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     to: string;
     amountWei: string;
   }): Promise<{ txId: string; pending: PendingTx }> {
-    const tokenAddress = params.tokenAddress.trim();
-    if (!tokenAddress.startsWith("0x") || tokenAddress.length !== 42) {
-      throw new Error("Invalid token address");
-    }
+    const tokenAddress = validateAddress(params.tokenAddress, "token address");
     if (!isContractAllowed(tokenAddress, config)) {
       throw new Error("Token not in verifiedTokenAddresses (set interactWithUnverifiedContracts or add to list)");
     }
@@ -331,8 +333,7 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     if (!meta) throw new Error("Wallet not found");
     const chainId = params.chainId ?? defaultChainId;
     if (!config.chains[chainId]) throw new Error("Chain " + chainId + " not configured");
-    const to = params.to.trim();
-    if (!to.startsWith("0x") || to.length !== 42) throw new Error("Invalid to address");
+    const to = validateAddress(params.to, "recipient address");
     const amountWei = BigInt(params.amountWei);
     if (amountWei <= 0n) throw new Error("Amount must be positive");
     if (limits?.allowedChains != null && limits.allowedChains.length > 0) {
@@ -384,10 +385,7 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     maxPriorityFeePerGas?: string;
     nonce?: number;
   }): Promise<{ txId: string; pending: PendingTx }> {
-    const to = params.to.trim();
-    if (!to.startsWith("0x") || to.length !== 42) {
-      throw new Error("Invalid contract address (to)");
-    }
+    const to = validateAddress(params.to, "contract address");
     if (!isContractAllowed(to, config)) {
       throw new Error(
         "Contract not in verifiedContractAddresses/verifiedTokenAddresses (set interactWithUnverifiedContracts or add to list)",
@@ -487,6 +485,26 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     const pending = await pendingStore.get(txId);
     if (!pending) return { error: "Pending tx not found" };
     if (pending.status !== "pending") return { error: "Tx status is " + pending.status };
+    // Expiration check: reject stale pending transactions
+    const age = Date.now() - pending.createdAt;
+    if (age > PENDING_TX_TTL_MS) {
+      await pendingStore.update(txId, { status: "failed", error: "Pending tx expired (>30min)" });
+      await audit.append({
+        action: "send_expired",
+        txId,
+        walletId: pending.walletId,
+        chainId: pending.chainId,
+      });
+      return { error: "Pending tx expired. Create a new transaction." };
+    }
+    // Optimistic lock: mark as "approved" immediately to prevent double-approval.
+    // If another concurrent call already changed the status, this re-check catches it.
+    const freshCheck = await pendingStore.get(txId);
+    if (!freshCheck || freshCheck.status !== "pending") {
+      return { error: "Tx already processed (status: " + (freshCheck?.status ?? "unknown") + ")" };
+    }
+    await pendingStore.update(txId, { status: "approved" });
+
     const privateKey = keychain.getPrivateKey(pending.walletId);
     if (!privateKey) {
       await pendingStore.update(txId, { status: "failed", error: "Cannot read wallet key" });
@@ -540,6 +558,23 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     }
   }
 
+  async function rejectTx(txId: string): Promise<{ ok: boolean; error?: string }> {
+    const pending = await pendingStore.get(txId);
+    if (!pending) return { ok: false, error: "Pending tx not found" };
+    if (pending.status !== "pending") return { ok: false, error: "Tx status is " + pending.status };
+    await pendingStore.update(txId, { status: "rejected" });
+    await audit.append({
+      action: "send_rejected",
+      txId,
+      walletId: pending.walletId,
+      chainId: pending.chainId,
+      from: pending.from,
+      to: pending.to,
+      valueWei: pending.valueWei,
+    });
+    return { ok: true };
+  }
+
   async function getPendingTx(txId: string): Promise<PendingTx | null> {
     return pendingStore.get(txId);
   }
@@ -547,6 +582,10 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
   async function listPending(): Promise<PendingTx[]> {
     const items = await pendingStore.load();
     return items.filter((t) => t.status === "pending");
+  }
+
+  async function queryHistory(filter?: AuditLogFilter): Promise<AuditEntry[]> {
+    return audit.query(filter);
   }
 
   return {
@@ -558,13 +597,14 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     getDefaultWalletId,
     listWallets,
     setDefaultWallet,
-    getPrivateKey,
     requestSend,
     requestErc20Approve,
     requestErc20Transfer,
     requestContractCall,
     approveTx,
+    rejectTx,
     getPendingTx,
     listPending,
+    queryHistory,
   };
 }

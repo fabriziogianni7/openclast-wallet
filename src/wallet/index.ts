@@ -29,6 +29,7 @@ export { createRpcClient } from "./rpc.js";
 export { createPendingStore } from "./pending-store.js";
 export { createStateStore } from "./state-store.js";
 export { createAuditLog } from "./audit.js";
+export type { AuditEntry, AuditLogFilter } from "./audit.js";
 export { privateKeyToAddress, buildAndSignTx } from "./tx-builder.js";
 export { SEPOLIA_CHAIN_ID } from "./types.js";
 export type { WalletIntegrationConfig } from "./config-adapter.js";

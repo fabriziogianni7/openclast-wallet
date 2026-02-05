@@ -35,6 +35,8 @@ export type {
   WalletConfig,
   WalletsLimits,
   WalletIntegrationConfig,
+  AuditEntry,
+  AuditLogFilter,
 } from "./wallet/index.js";
 
 export { resolveStateDir } from "./wallet/index.js";

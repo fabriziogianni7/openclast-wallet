@@ -13,21 +13,53 @@ metadata:
 # Openclast Wallet Guide
 
 ## Exposed tools
-  - `wallet_address` — get default wallet address (or by walletId)
-  - `wallet_balance` — get native balance (optionally ERC‑20 balances)
-  - `wallet_create` — create a new wallet
+
+### Wallet management
+  - `wallet_create` — create a new wallet (keys never exposed)
   - `wallet_list` — list wallets + default
   - `wallet_setDefault` — set default wallet
+  - `wallet_address` — get default wallet address (or by walletId)
+
+### Balance & read
+  - `wallet_balance` — get native balance, optionally ERC-20 balances. Supports `allChains: true` for portfolio view and `tokenAddress` for arbitrary ERC20 queries.
+  - `wallet_readContract` — read-only contract call (eth_call). No approval needed. Returns raw hex.
+  - `wallet_chains` — list all configured chains, names, RPCs, explorers.
+
+### ABI encoding
+  - `wallet_encodeCall` — encode calldata from a function signature + args. Use this to build `data` for `wallet_contract_call` and `wallet_readContract`.
+
+### Transactions (write, requires approval)
   - `wallet_send` — create pending native send
-  - `wallet_erc20_approve` — create pending ERC‑20 approve
-  - `wallet_erc20_transfer` — create pending ERC‑20 transfer
-  - `wallet_contract_call` — create pending contract call
-  - `wallet_txStatus` — get pending tx status
+  - `wallet_erc20_approve` — create pending ERC-20 approve
+  - `wallet_erc20_transfer` — create pending ERC-20 transfer
+  - `wallet_contract_call` — create pending arbitrary contract call (manual params)
+  - `wallet_sendTransaction` — create pending tx from a raw `transactionRequest` object (from LI.FI, 1inch, CoW, etc). **Use this when a protocol API gives you a ready-made transactionRequest.**
+
+### Approval flow
   - `wallet_approve` — approve + broadcast pending tx
+  - `wallet_reject` — reject/cancel a pending tx
+  - `wallet_listPending` — list all pending transactions awaiting approval
+  - `wallet_txStatus` — get pending tx status
+
+### History
+  - `wallet_history` — query audit log (filter by wallet, chain, action)
+
+## Human-readable amounts
+
+All transaction tools (`wallet_send`, `wallet_erc20_approve`, `wallet_erc20_transfer`, `wallet_contract_call`) accept human-readable amounts:
+
+- **Native ETH**: use `amount` + `unit` (e.g. `amount: "0.5"`, `unit: "ether"`)
+- **ERC20 tokens**: use `amount` + `decimals` (e.g. `amount: "100"`, `decimals: 6` for USDC)
+- **Raw wei**: use `valueWei` or `amountWei` directly (legacy, still supported)
+
+Supported units: `wei`, `kwei`, `mwei`, `gwei`, `szabo`, `finney`, `ether`/`eth`.
+
+When the user says "send 0.5 ETH", use `amount: "0.5"`, `unit: "ether"`. Do NOT try to manually convert to wei.
 
 ## Config
 - Prefer `wallet-config.json` in the project root and customize chains and limits before use.
 - Keep `wallet-config.json` separate from `openclaw.json` (Openclaw config does not accept a top-level `wallets` key).
+- Use `wallet_chains` to discover available chains before assuming chain IDs.
 
 ## Approval flow (mandatory)
 
@@ -37,7 +69,11 @@ Always:
 2. Ask the user to approve.
 3. Only after approval, broadcast and confirm.
 
-If the user asks to “just send,” send that transaction without asking for approval again, and give a recap of the transaction.
+If the user asks to "just send," send that transaction without asking for approval again, and give a recap of the transaction.
+
+If the user says "cancel" or "reject", use `wallet_reject` with the txId.
+
+To see what's waiting, use `wallet_listPending`.
 
 Status semantics:
 - `pending`: waiting for user approval; **not** broadcast yet.
@@ -58,10 +94,53 @@ Wallet creation is safe: `wallet_create` returns address metadata only (no keys)
 ## Common tasks
 
 ### Balance and tokens
+- There is no default chain; the wallet is chain-agnostic.
 - EVM wallet addresses are chain-agnostic; do not ask to switch wallets for a balance check.
-- when a user asks for a balance, use the `wallet_balance` tool to get the balance and check all the configuredchains.
+- When a user asks for a balance, use `wallet_balance` with `allChains: true` to check all configured chains at once.
+- To check a specific ERC20 token, use the `tokenAddress` parameter.
 - If multiple wallets exist and the user does not specify one, use the default wallet.
 - If a chain is not configured, read-only balance may still be possible via well-known public RPCs.
+
+### Reading contract state (no tx needed)
+- Use `wallet_encodeCall` to build calldata, then `wallet_readContract` to execute.
+- Example: check an ERC20 allowance:
+  1. `wallet_encodeCall` with `functionSignature: "allowance(address,address)"`, `args: ["0xOwner", "0xSpender"]`
+  2. `wallet_readContract` with the returned `data` and the token's `to` address.
+
+### Interacting with DeFi contracts (manual)
+- Use `wallet_encodeCall` to build calldata for any function signature.
+- Pass the encoded `data` to `wallet_contract_call`.
+- Example: swap on a DEX:
+  1. `wallet_encodeCall` with the swap function signature and args.
+  2. `wallet_contract_call` with the encoded data, contract address, and optional ETH value.
+  3. Wait for user approval, then `wallet_approve`.
+
+### Executing protocol transaction requests (LI.FI, 1inch, CoW, etc.)
+
+Other skills (e.g. LI.FI, 1inch) handle quoting and route selection. They return a `transactionRequest` object. **Use `wallet_sendTransaction` to execute it.** Do NOT decompose it into individual params.
+
+#### When you receive a `transactionRequest` from another skill
+1. If the source token is ERC20 (not native ETH) and an `approvalAddress` is provided, call `wallet_erc20_approve` first with `spender` set to the `approvalAddress`.
+2. Pass the **entire** `transactionRequest` object to `wallet_sendTransaction`:
+   ```json
+   {
+     "transactionRequest": {
+       "to": "0x1111111254fb6c44bac0bed2854e76f90643097d",
+       "data": "0x...",
+       "value": "0x0de0b6b3a7640000",
+       "chainId": 137,
+       "gasLimit": "0x0e9cb2",
+       "gasPrice": "0xb2d05e00"
+     }
+   }
+   ```
+3. `wallet_sendTransaction` auto-converts hex values to decimal internally.
+4. Approve or reject the pending tx as usual.
+
+#### Key rules
+- **Never** manually convert hex values -- `wallet_sendTransaction` handles it.
+- **Never** decompose the object into separate `wallet_contract_call` params -- pass it as one object.
+- Always show the user the estimated outcome (toAmount, fees, slippage) before asking for approval.
 
 ### Listing wallets
 - Only show wallet addresses in agent when asking about listing wallets, not IDs.
@@ -70,6 +149,7 @@ Wallet creation is safe: `wallet_create` returns address metadata only (no keys)
 - Validate chainId and recipient.
 - Respect per-tx and daily limits from config.
 - Always provide a block explorer link when a tx is confirmed.
+- Prefer `amount` + `unit` over raw wei for user-facing amounts.
 
 ### Chain name → chainId
 
@@ -83,7 +163,7 @@ Wallet creation is safe: `wallet_create` returns address metadata only (no keys)
 - Avalanche: `43114`
 - Binance Smart Chain: `56`
 
-Use Sepolia only if specified by the user.
+Use `wallet_chains` to discover configured chains dynamically. Use Sepolia only if specified by the user.
 
 Token address reference:
 - See `skills/openclast-wallet/TOKENS.md` for common token addresses.
@@ -93,7 +173,6 @@ Token address reference:
 
 - Default mode is notify/approval, not auto-send.
 - Never export or display private keys.
-
 
 ## Config rules (apply when present)
 
@@ -110,4 +189,10 @@ After approval and broadcast, always include a tx link. Use:
 
 Base URL comes from `wallets.chains.<chainId>.blockExplorerUrl` when configured, otherwise fallback well-known explorers.
 
+## History
 
+Use `wallet_history` to answer questions like "what did I send yesterday" or "show my recent transactions". Filter by:
+- `walletId` — specific wallet
+- `chainId` — specific chain
+- `action` — event type (e.g. `send_approved`, `erc20_transfer_requested`)
+- `limit` — number of entries (default 50)
