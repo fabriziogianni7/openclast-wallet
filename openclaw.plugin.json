@@ -1,0 +1,81 @@
+{
+  "id": "openclast-wallet",
+  "skills": [
+    "skills/openclast-wallet"
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "configPath": { "type": "string" },
+      "wallets": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "autoCreateOnStartup": { "type": "boolean" },
+          "interactWithUnverifiedContracts": { "type": "boolean" },
+          "defaults": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "spending": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "mode": { "type": "string", "enum": ["notify", "auto"] },
+                  "limitPerTx": { "type": "string" },
+                  "dailyLimit": { "type": "string" },
+                  "allowedChains": {
+                    "type": "array",
+                    "items": { "type": "number" }
+                  },
+                  "allowedRecipients": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "notifyChannels": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
+                }
+              },
+              "verifiedTokenAddresses": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "verifiedContractAddresses": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          },
+          "chains": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "rpcUrl": { "type": "string" },
+                "blockExplorerUrl": { "type": "string" }
+              }
+            }
+          },
+          "notify": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "primaryChannel": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "wallets.autoCreateOnStartup": { "label": "Auto-create wallet on startup" },
+    "wallets.defaults.spending.mode": { "label": "Spending mode" },
+    "wallets.defaults.spending.limitPerTx": { "label": "Per-tx limit (wei)" },
+    "wallets.defaults.spending.dailyLimit": { "label": "Daily limit (wei)" },
+    "wallets.notify.primaryChannel": { "label": "Notify channel" }
+  }
+}
