@@ -45,7 +45,8 @@ function keychainAccount(walletId: string): string {
 }
 
 function darwinSetPassword(service: string, account: string, password: string): void {
-  assertSafeShellParam(account, "keychain account");
+  // account is always produced by keychainAccount() which already validated walletId.
+  // password (private key) is validated by SAFE_PRIVKEY_RE before reaching here.
   assertSafeShellParam(password, "keychain password");
   try {
     execSync(
@@ -61,7 +62,6 @@ function darwinSetPassword(service: string, account: string, password: string): 
 }
 
 function darwinGetPassword(service: string, account: string): string | null {
-  assertSafeShellParam(account, "keychain account");
   try {
     const result = execSync(
       `security find-generic-password -s '${service}' -a '${account}' -w 2>/dev/null`,
@@ -74,7 +74,6 @@ function darwinGetPassword(service: string, account: string): string | null {
 }
 
 function darwinDeletePassword(service: string, account: string): boolean {
-  assertSafeShellParam(account, "keychain account");
   try {
     execSync(`security delete-generic-password -s '${service}' -a '${account}' 2>/dev/null`, {
       encoding: "utf8",
