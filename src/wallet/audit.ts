@@ -5,6 +5,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import type { WalletType } from "./types.js";
+
 const AUDIT_FILENAME = "audit.jsonl";
 
 export type AuditEntry = {
@@ -13,6 +15,7 @@ export type AuditEntry = {
   txId?: string;
   walletId?: string;
   chainId?: number;
+  type?: WalletType;
   from?: string;
   to?: string;
   valueWei?: string;

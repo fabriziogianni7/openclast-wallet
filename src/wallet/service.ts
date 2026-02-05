@@ -126,7 +126,7 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     if (!meta) throw new Error("Wallet not found");
     state.defaultWalletId = walletId;
     await stateStore.save(state);
-    await audit.append({ action: "wallet_default_set", walletId, chainId: meta.chainId });
+    await audit.append({ action: "wallet_default_set", walletId, type: meta.type });
     return meta;
   }
 
@@ -136,7 +136,7 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     const meta: WalletMeta = {
       walletId,
       address,
-      chainId: defaultChainId,
+      type: "EVM",
       createdAt: Date.now(),
     };
     const state = await stateStore.load();
@@ -153,7 +153,7 @@ export function createWalletService(config: WalletServiceConfig): WalletService 
     const meta: WalletMeta = {
       walletId,
       address,
-      chainId: defaultChainId,
+      type: "EVM",
       createdAt: Date.now(),
     };
     const state = await stateStore.load();

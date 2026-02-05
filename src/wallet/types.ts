@@ -7,10 +7,12 @@ export type WalletId = string;
 
 export type ChainId = number;
 
+export type WalletType = "EVM";
+
 export type WalletMeta = {
   walletId: WalletId;
   address: string;
-  chainId: ChainId;
+  type: WalletType;
   createdAt: number;
 };
 

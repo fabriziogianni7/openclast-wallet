@@ -221,7 +221,7 @@ const walletPlugin = {
         return {
           walletId: meta.walletId,
           address: meta.address,
-          chainId: meta.chainId,
+          type: meta.type,
           createdAt: meta.createdAt,
         };
       }),
@@ -260,7 +260,7 @@ const walletPlugin = {
         return {
           walletId: meta.walletId,
           address: meta.address,
-          chainId: meta.chainId,
+          type: meta.type,
           createdAt: meta.createdAt,
         };
       }),
