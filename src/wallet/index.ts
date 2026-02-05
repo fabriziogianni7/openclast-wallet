@@ -78,13 +78,17 @@ export function resolveWalletChains(cfg: WalletIntegrationConfig): Record<number
 }
 
 /**
- * Default chain ID when multiple are configured (Sepolia if present, else first).
+ * Default chain ID when multiple are configured.
+ * Picks the first non-testnet chain, otherwise the first configured chain.
+ * Sepolia is only used if it's the *only* configured chain.
  */
 export function resolveDefaultChainId(cfg: WalletIntegrationConfig): number {
   const map = resolveWalletChains(cfg);
-  if (map[SEPOLIA_CHAIN_ID]) return SEPOLIA_CHAIN_ID;
-  const first = Object.keys(map).map(Number).find((n) => Number.isFinite(n));
-  return first ?? SEPOLIA_CHAIN_ID;
+  const ids = Object.keys(map).map(Number).filter((n) => Number.isFinite(n));
+  if (ids.length === 0) return SEPOLIA_CHAIN_ID;
+  // Prefer a non-testnet chain as default
+  const nonTestnet = ids.find((id) => id !== SEPOLIA_CHAIN_ID);
+  return nonTestnet ?? ids[0];
 }
 
 /**

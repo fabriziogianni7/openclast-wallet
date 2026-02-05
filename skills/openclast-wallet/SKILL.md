@@ -146,24 +146,27 @@ Other skills (e.g. LI.FI, 1inch) handle quoting and route selection. They return
 - Only show wallet addresses in agent when asking about listing wallets, not IDs.
 
 ### Sending
+- **CRITICAL: Always extract the chain from the user's message and pass `chainId` explicitly.** If the user says "on Base", pass `chainId: 8453`. If the user says "on Polygon", pass `chainId: 137`. Never rely on the default chain when the user specifies one.
 - Validate chainId and recipient.
 - Respect per-tx and daily limits from config.
 - Always provide a block explorer link when a tx is confirmed.
 - Prefer `amount` + `unit` over raw wei for user-facing amounts.
 
-### Chain name → chainId
+### Chain name → chainId (MUST use when user mentions a chain)
 
-- Ethereum / Mainnet: `1`
+- Ethereum / Mainnet / ETH mainnet: `1`
 - Sepolia: `11155111`
-- Polygon: `137`
+- Polygon / Matic: `137`
 - Base: `8453`
-- Arbitrum One: `42161`
-- Optimism: `10`
+- Arbitrum / Arbitrum One: `42161`
+- Optimism / OP: `10`
 - Fantom: `250`
-- Avalanche: `43114`
-- Binance Smart Chain: `56`
+- Avalanche / Avax: `43114`
+- Binance Smart Chain / BSC / BNB Chain: `56`
 
-Use `wallet_chains` to discover configured chains dynamically. Use Sepolia only if specified by the user.
+**When the user says "on <chain>" or mentions a chain name, you MUST map it to the chainId above and pass it in every tool call.** Never omit `chainId` when the user specifies a chain.
+
+Use `wallet_chains` to discover configured chains dynamically. Use Sepolia only if the user explicitly says "Sepolia".
 
 Token address reference:
 - See `skills/openclast-wallet/TOKENS.md` for common token addresses.

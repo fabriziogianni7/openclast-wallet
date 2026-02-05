@@ -1,0 +1,1 @@
+git add . && git commit -am "fix chain id selection" && git push && pnpm publish

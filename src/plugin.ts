@@ -202,7 +202,7 @@ const walletListSchema = Type.Object({});
 
 const walletSendSchema = Type.Object({
   walletId: Type.Optional(Type.String({ description: "Wallet id override" })),
-  chainId: Type.Optional(Type.Number({ description: "Chain id override" })),
+  chainId: Type.Optional(Type.Number({ description: "Target chain id. ALWAYS extract from user message (e.g. 'on Base' → 8453, 'on Polygon' → 137, 'on Arbitrum' → 42161, 'on Ethereum' → 1). Only omit if user does not mention any chain." })),
   to: Type.String({ description: "Recipient address (0x...)" }),
   valueWei: Type.Optional(Type.String({ description: "Amount in wei (use `amount`+`unit` instead for human-readable)" })),
   amount: Type.Optional(Type.String({ description: AMOUNT_DESCRIPTION })),
@@ -225,7 +225,7 @@ const walletListPendingSchema = Type.Object({});
 
 const walletErc20ApproveSchema = Type.Object({
   walletId: Type.Optional(Type.String({ description: "Wallet id override" })),
-  chainId: Type.Optional(Type.Number({ description: "Chain id override" })),
+  chainId: Type.Optional(Type.Number({ description: "Target chain id. ALWAYS extract from user message (e.g. 'on Base' → 8453, 'on Polygon' → 137, 'on Arbitrum' → 42161, 'on Ethereum' → 1). Only omit if user does not mention any chain." })),
   tokenAddress: Type.String({ description: "ERC20 contract address (0x...)" }),
   spender: Type.String({ description: "Spender address (0x...)" }),
   amountWei: Type.Optional(Type.String({ description: "Allowance in wei (use `amount`+`unit` instead for human-readable)" })),
@@ -236,7 +236,7 @@ const walletErc20ApproveSchema = Type.Object({
 
 const walletErc20TransferSchema = Type.Object({
   walletId: Type.Optional(Type.String({ description: "Wallet id override" })),
-  chainId: Type.Optional(Type.Number({ description: "Chain id override" })),
+  chainId: Type.Optional(Type.Number({ description: "Target chain id. ALWAYS extract from user message (e.g. 'on Base' → 8453, 'on Polygon' → 137, 'on Arbitrum' → 42161, 'on Ethereum' → 1). Only omit if user does not mention any chain." })),
   tokenAddress: Type.String({ description: "ERC20 contract address (0x...)" }),
   to: Type.String({ description: "Recipient address (0x...)" }),
   amountWei: Type.Optional(Type.String({ description: "Amount in wei (use `amount`+`unit` instead for human-readable)" })),
@@ -248,7 +248,7 @@ const walletErc20TransferSchema = Type.Object({
 // Simplified: flat params only, no nested transactionRequest
 const walletContractCallSchema = Type.Object({
   walletId: Type.Optional(Type.String({ description: "Wallet id override" })),
-  chainId: Type.Optional(Type.Number({ description: "Chain id override" })),
+  chainId: Type.Optional(Type.Number({ description: "Target chain id. ALWAYS extract from user message (e.g. 'on Base' → 8453, 'on Polygon' → 137, 'on Arbitrum' → 42161, 'on Ethereum' → 1). Only omit if user does not mention any chain." })),
   to: Type.String({ description: "Contract address (0x...)" }),
   data: Type.String({ description: "Calldata hex (0x...). Use wallet_encodeCall to build this." }),
   valueWei: Type.Optional(Type.String({ description: "ETH value in wei (use `amount`+`unit` instead for human-readable)" })),
@@ -583,7 +583,7 @@ const walletPlugin = {
       name: "wallet_send",
       label: "Wallet Send",
       description:
-        'Create a pending native send transaction. Supports human-readable amounts: use `amount` + `unit` (e.g. amount:"0.5", unit:"ether") OR raw `valueWei`.',
+        'Create a pending native send transaction. IMPORTANT: If the user specifies a chain (e.g. "on Base", "on Polygon"), you MUST pass the corresponding chainId (Base=8453, Polygon=137, Arbitrum=42161, Ethereum=1, Sepolia=11155111). Supports human-readable amounts: use `amount` + `unit` (e.g. amount:"0.5", unit:"ether") OR raw `valueWei`.',
       parameters: walletSendSchema,
       execute: withErrors(async (params) => {
         const svc = ensureService();
