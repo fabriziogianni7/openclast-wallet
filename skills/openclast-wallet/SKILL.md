@@ -81,6 +81,33 @@ Status semantics:
 - `failed`: signing or broadcast failed.
 - `rejected`: approval was declined.
 
+## Telegram approval flow (when running on Telegram)
+
+When you create a pending transaction, ALWAYS present it with inline approve/reject buttons using the `message` tool:
+
+1. Create the pending tx (wallet_send / wallet_sendTransaction / etc).
+2. Send an approval message with buttons:
+   - Use the `message` tool with `action: "send"`, `channel: "telegram"`.
+   - Set `to` to the current chat/user ID.
+   - Include `buttons` with Approve and Reject options.
+   - Put the txId in the callback_data (Telegram limits callback_data to 64 bytes; use short prefixes like `approve <txId>` and `reject <txId>`).
+
+Example message tool call after creating a pending tx with txId "abc-123":
+```json
+{
+  "action": "send",
+  "channel": "telegram",
+  "message": "Transaction pending:\n\nSwap 0.05 ETH -> ~127 USDC on Base\nVia: LI.FI (Uniswap V3)\nGas: ~$0.02\n\nApprove or reject?",
+  "buttons": [[
+    { "text": "Approve", "callback_data": "approve abc-123" },
+    { "text": "Reject", "callback_data": "reject abc-123" }
+  ]]
+}
+```
+
+3. When you receive a message starting with "approve " followed by a txId, call `wallet_approve` with that txId.
+4. When you receive a message starting with "reject " followed by a txId, call `wallet_reject` with that txId.
+
 ## Key export warning (mandatory)
 
 Never expose private keys by default. If the user asks for export:

@@ -3,20 +3,32 @@ import fs from "node:fs";
 import { jsonResult } from "openclaw/plugin-sdk";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import {
+  createEncryptedFileKeychainAdapter,
   createRpcClient,
-  createWalletServiceFromConfig,
+  createWalletService,
   getBlockExplorerAddressUrl,
   getBlockExplorerTxUrl,
-  initWalletOnStartup,
   resolveDefaultChainId,
+  resolveStateDirForPeer,
   resolveWalletChainConfigForBalance,
   resolveWalletChains,
+  SEPOLIA_CHAIN_ID,
   type WalletIntegrationConfig,
   type WalletService,
 } from "./wallet/index.js";
 import { getTokenBalances } from "./wallet/token-balances.js";
 
 type PluginConfig = WalletIntegrationConfig;
+
+/** Context passed to tool factories by OpenClaw (sessionKey format: agent:<agentId>:telegram:dm:<peerId>) */
+type ToolContext = { sessionKey?: string };
+
+function extractPeerId(sessionKey?: string): string {
+  if (!sessionKey) return "default";
+  const parts = sessionKey.split(":");
+  const dmIdx = parts.indexOf("dm");
+  return dmIdx >= 0 && parts[dmIdx + 1] ? parts[dmIdx + 1]! : "default";
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
@@ -361,17 +373,48 @@ const walletPlugin = {
   configSchema: walletPluginConfigSchema,
   register(api: OpenClawPluginApi) {
     const config = walletPluginConfigSchema.parse(api.pluginConfig);
-    let service: WalletService | null = null;
+    const serviceCache = new Map<string, WalletService>();
 
-    const ensureService = () => {
-      if (service) return service;
-      const created = createWalletServiceFromConfig(config);
-      if (!created) {
-        throw new Error("Invalid wallet config: unable to initialize wallet service.");
+    const chains = resolveWalletChains(config);
+    const defaultChainId = resolveDefaultChainId(config);
+    const limits = config.wallets?.defaults?.spending;
+    const notify = config.wallets?.notify;
+
+    async function getServiceForContext(ctx: ToolContext): Promise<WalletService> {
+      const peerId = extractPeerId(ctx.sessionKey);
+      const cached = serviceCache.get(peerId);
+      if (cached) return cached;
+      const stateDir = resolveStateDirForPeer(peerId);
+      const keychainAdapter =
+        process.platform === "darwin"
+          ? undefined
+          : createEncryptedFileKeychainAdapter(stateDir);
+      const chainsResolved =
+        Object.keys(chains).length > 0
+          ? chains
+          : {
+              [SEPOLIA_CHAIN_ID]: {
+                chainId: SEPOLIA_CHAIN_ID,
+                rpcUrl: "https://rpc.sepolia.org",
+              },
+            };
+      const svc = createWalletService({
+        stateDir,
+        chains: chainsResolved,
+        defaultChainId,
+        limits,
+        notify,
+        interactWithUnverifiedContracts: config.wallets?.interactWithUnverifiedContracts,
+        verifiedTokenAddresses: config.wallets?.defaults?.verifiedTokenAddresses,
+        verifiedContractAddresses: config.wallets?.defaults?.verifiedContractAddresses,
+        keychainAdapter,
+      });
+      if (config.wallets?.autoCreateOnStartup === true) {
+        await svc.ensureDefaultWallet();
       }
-      service = created;
-      return created;
-    };
+      serviceCache.set(peerId, svc);
+      return svc;
+    }
 
     const withErrors =
       (handler: (params: Record<string, unknown>) => Promise<unknown>) =>
@@ -384,13 +427,13 @@ const walletPlugin = {
       };
 
     /* ---- wallet_address ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_address",
       label: "Wallet Address",
       description: "Get the default wallet address (or an explicit walletId).",
       parameters: walletAddressSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const walletId = typeof params.walletId === "string" ? params.walletId : undefined;
         const address = await svc.getAddress(walletId);
         if (!address) {
@@ -405,17 +448,17 @@ const walletPlugin = {
           explorerUrl: getBlockExplorerAddressUrl(config, chainId, address),
         };
       }),
-    });
+    }));
 
     /* ---- wallet_balance ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_balance",
       label: "Wallet Balance",
       description:
         "Fetch native balance and optional ERC20 balances. Use `allChains: true` to get balances across all configured chains. Use `tokenAddress` to query any arbitrary ERC20.",
       parameters: walletBalanceSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const walletId = typeof params.walletId === "string" ? params.walletId : undefined;
         const address = await svc.getAddress(walletId);
         if (!address) {
@@ -517,16 +560,16 @@ const walletPlugin = {
           explorerUrl: getBlockExplorerAddressUrl(config, chainId, address),
         };
       }),
-    });
+    }));
 
     /* ---- wallet_create ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_create",
       label: "Wallet Create",
       description: "Create a new wallet (address only; keys are never exposed).",
       parameters: walletCreateSchema,
       execute: withErrors(async () => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const meta = await svc.createWallet();
         return {
           walletId: meta.walletId,
@@ -535,16 +578,16 @@ const walletPlugin = {
           createdAt: meta.createdAt,
         };
       }),
-    });
+    }));
 
     /* ---- wallet_list ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_list",
       label: "Wallet List",
       description: "List known wallets and the current default wallet.",
       parameters: walletListSchema,
       execute: withErrors(async () => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const { wallets, defaultWalletId } = await svc.listWallets();
         return {
           defaultWalletId,
@@ -554,16 +597,16 @@ const walletPlugin = {
           })),
         };
       }),
-    });
+    }));
 
     /* ---- wallet_setDefault ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_setDefault",
       label: "Wallet Set Default",
       description: "Set the default wallet by id.",
       parameters: walletSetDefaultSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const walletId = typeof params.walletId === "string" ? params.walletId : "";
         if (!walletId) {
           throw new Error("walletId is required");
@@ -576,17 +619,17 @@ const walletPlugin = {
           createdAt: meta.createdAt,
         };
       }),
-    });
+    }));
 
     /* ---- wallet_send (with human-readable amounts) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_send",
       label: "Wallet Send",
       description:
         'Create a pending native send transaction. IMPORTANT: If the user specifies a chain (e.g. "on Base", "on Polygon"), you MUST pass the corresponding chainId (Base=8453, Polygon=137, Arbitrum=42161, Ethereum=1, Sepolia=11155111). Supports human-readable amounts: use `amount` + `unit` (e.g. amount:"0.5", unit:"ether") OR raw `valueWei`.',
       parameters: walletSendSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const rawTo = params.to;
         if (typeof rawTo !== "string" || !rawTo.trim()) {
           throw new Error(`Missing or invalid 'to' parameter (received type=${typeof rawTo}, value=${JSON.stringify(rawTo)})`);
@@ -599,17 +642,17 @@ const walletPlugin = {
         const result = await svc.requestSend({ walletId, chainId, to, valueWei });
         return { txId: result.txId, pending: result.pending };
       }),
-    });
+    }));
 
     /* ---- wallet_erc20_approve (with human-readable amounts) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_erc20_approve",
       label: "Wallet ERC20 Approve",
       description:
         'Create a pending ERC20 approve transaction. Supports human-readable amounts: use `amount` + `decimals` (e.g. amount:"100", decimals:6 for USDC) OR raw `amountWei`.',
       parameters: walletErc20ApproveSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const tokenAddress = typeof params.tokenAddress === "string" ? params.tokenAddress : "";
         const spender = typeof params.spender === "string" ? params.spender : "";
         const amountWei = parseHumanAmount(params, "amountWei");
@@ -625,17 +668,17 @@ const walletPlugin = {
         });
         return { txId: result.txId, pending: result.pending };
       }),
-    });
+    }));
 
     /* ---- wallet_erc20_transfer (with human-readable amounts) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_erc20_transfer",
       label: "Wallet ERC20 Transfer",
       description:
         'Create a pending ERC20 transfer transaction. Supports human-readable amounts: use `amount` + `decimals` (e.g. amount:"50", decimals:6 for USDC) OR raw `amountWei`.',
       parameters: walletErc20TransferSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const tokenAddress = typeof params.tokenAddress === "string" ? params.tokenAddress : "";
         const to = typeof params.to === "string" ? params.to : "";
         const amountWei = parseHumanAmount(params, "amountWei");
@@ -651,17 +694,17 @@ const walletPlugin = {
         });
         return { txId: result.txId, pending: result.pending };
       }),
-    });
+    }));
 
     /* ---- wallet_contract_call (simplified, with human-readable amounts) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_contract_call",
       label: "Wallet Contract Call",
       description:
         'Create a pending contract call transaction. Use wallet_encodeCall to build the `data` param. Supports human-readable ETH value: use `amount` + `unit` OR raw `valueWei`.',
       parameters: walletContractCallSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const to = typeof params.to === "string" ? params.to : "";
         const data = typeof params.data === "string" ? params.data : "";
         const valueWei = parseHumanAmount(params, "valueWei");
@@ -681,16 +724,16 @@ const walletPlugin = {
         });
         return { txId: result.txId, pending: result.pending };
       }),
-    });
+    }));
 
     /* ---- wallet_txStatus ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_txStatus",
       label: "Wallet Transaction Status",
       description: "Get the status of a pending transaction (pending=awaiting approval).",
       parameters: walletTxStatusSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const txId = typeof params.txId === "string" ? params.txId : "";
         const pending = await svc.getPendingTx(txId);
         if (!pending) {
@@ -725,16 +768,16 @@ const walletPlugin = {
               : undefined,
         };
       }),
-    });
+    }));
 
     /* ---- wallet_approve ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_approve",
       label: "Wallet Approve Transaction",
       description: "Approve and broadcast a pending transaction.",
       parameters: walletApproveSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const txId = typeof params.txId === "string" ? params.txId : "";
         const result = await svc.approveTx(txId);
         if ("error" in result) {
@@ -747,40 +790,40 @@ const walletPlugin = {
           explorerUrl: getBlockExplorerTxUrl(config, result.chainId, result.txHash),
         };
       }),
-    });
+    }));
 
     /* ---- wallet_reject ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_reject",
       label: "Wallet Reject Transaction",
       description: "Reject/cancel a pending transaction (marks it as rejected, never broadcasts).",
       parameters: walletRejectSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const txId = typeof params.txId === "string" ? params.txId : "";
         return svc.rejectTx(txId);
       }),
-    });
+    }));
 
     /* ---- wallet_listPending ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_listPending",
       label: "Wallet List Pending",
       description:
         "List all pending transactions awaiting approval. Returns only transactions with status 'pending'.",
       parameters: walletListPendingSchema,
       execute: withErrors(async () => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const pending = await svc.listPending();
         return {
           count: pending.length,
           pending,
         };
       }),
-    });
+    }));
 
     /* ---- wallet_readContract (read-only eth_call) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_readContract",
       label: "Wallet Read Contract",
       description:
@@ -810,10 +853,10 @@ const walletPlugin = {
           result: result.data ?? "0x",
         };
       }),
-    });
+    }));
 
     /* ---- wallet_encodeCall (ABI encoding helper) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_encodeCall",
       label: "Wallet Encode Call",
       description:
@@ -854,10 +897,10 @@ const walletPlugin = {
 
         return { data: encoded, functionSignature: sig, args };
       }),
-    });
+    }));
 
     /* ---- wallet_chains (config introspection) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_chains",
       label: "Wallet Chains",
       description:
@@ -881,17 +924,17 @@ const walletPlugin = {
           chains: entries,
         };
       }),
-    });
+    }));
 
     /* ---- wallet_history (audit log query) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_history",
       label: "Wallet History",
       description:
         "Query wallet transaction history from the audit log. Returns recent entries (most recent first). Filter by walletId, chainId, or action type.",
       parameters: walletHistorySchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const filter: Record<string, unknown> = {};
         if (typeof params.walletId === "string") filter.walletId = params.walletId;
         if (typeof params.chainId === "number") filter.chainId = params.chainId;
@@ -903,10 +946,10 @@ const walletPlugin = {
           entries,
         };
       }),
-    });
+    }));
 
     /* ---- wallet_sendTransaction (raw tx request passthrough) ---- */
-    api.registerTool({
+    api.registerTool((ctx: ToolContext) => ({
       name: "wallet_sendTransaction",
       label: "Wallet Send Transaction",
       description:
@@ -915,7 +958,7 @@ const walletPlugin = {
         "The transaction still goes through the approval flow.",
       parameters: walletSendTransactionSchema,
       execute: withErrors(async (params) => {
-        const svc = ensureService();
+        const svc = await getServiceForContext(ctx);
         const txReq = isObject(params.transactionRequest)
           ? params.transactionRequest
           : undefined;
@@ -958,24 +1001,16 @@ const walletPlugin = {
         });
         return { txId: result.txId, pending: result.pending };
       }),
-    });
+    }));
 
     /* ---- background service ---- */
     api.registerService({
       id: "openclast-wallet",
       start: async () => {
-        try {
-          await initWalletOnStartup(config);
-        } catch (error) {
-          api.logger.error(
-            `[openclast-wallet] Failed to auto-create wallet: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          );
-        }
+        /* Per-user wallets are created on first getServiceForContext when autoCreateOnStartup is true. */
       },
       stop: async () => {
-        service = null;
+        serviceCache.clear();
       },
     });
   },

@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 
 import { getAddress, isAddress } from "viem";
-import { createKeychainAdapter } from "./keychain.js";
+import { createKeychainAdapter, type KeychainAdapter } from "./keychain.js";
 import { createDailySpendStore, getTodayUtc } from "./daily-spend-store.js";
 import { encodeErc20Approve, encodeErc20Transfer } from "./erc20.js";
 import { createPendingStore } from "./pending-store.js";
@@ -60,6 +60,8 @@ export type WalletServiceConfig = {
   verifiedTokenAddresses?: string[];
   verifiedContractAddresses?: string[];
   platform?: NodeJS.Platform;
+  /** When provided, used instead of createKeychainAdapter(platform). For server/Linux use createEncryptedFileKeychainAdapter(stateDir). */
+  keychainAdapter?: KeychainAdapter;
 };
 
 export type WalletService = {
@@ -112,7 +114,8 @@ export type WalletService = {
 
 export function createWalletService(config: WalletServiceConfig): WalletService {
   const walletsDir = config.stateDir.replace(/\/$/, "") + "/wallets";
-  const keychain = createKeychainAdapter(config.platform ?? process.platform);
+  const keychain =
+    config.keychainAdapter ?? createKeychainAdapter(config.platform ?? process.platform);
   const stateStore = createStateStore(walletsDir);
   const pendingStore = createPendingStore(walletsDir);
   const audit = createAuditLog(walletsDir);

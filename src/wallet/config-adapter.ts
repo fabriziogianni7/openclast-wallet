@@ -73,3 +73,17 @@ export function resolveStateDir(
   if (!hasLegacy && hasNew) return newDir;
   return legacyDir;
 }
+
+/**
+ * Per-user state directory for multi-tenant isolation (e.g. Telegram bot).
+ * Returns <baseStateDir>/users/<peerId>. Use peerId from session key (e.g. Telegram user ID).
+ */
+export function resolveStateDirForPeer(
+  peerId: string,
+  baseStateDir?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const base = baseStateDir ?? resolveStateDir(env);
+  const safe = peerId.replace(/[^0-9a-zA-Z_-]/g, "_").trim() || "default";
+  return path.join(base.replace(/\/$/, ""), "users", safe);
+}

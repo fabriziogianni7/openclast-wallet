@@ -24,6 +24,7 @@ export function formatPendingTxNotification(pending: PendingTx): string {
 export type { WalletService, WalletServiceConfig } from "./service.js";
 export type { PendingTx, WalletMeta, WalletState, WalletConfig, WalletsLimits } from "./types.js";
 export { createKeychainAdapter } from "./keychain.js";
+export { createEncryptedFileKeychainAdapter } from "./keychain-encrypted.js";
 export { createWalletService } from "./service.js";
 export { createRpcClient } from "./rpc.js";
 export { createPendingStore } from "./pending-store.js";
@@ -33,7 +34,7 @@ export type { AuditEntry, AuditLogFilter } from "./audit.js";
 export { privateKeyToAddress, buildAndSignTx } from "./tx-builder.js";
 export { SEPOLIA_CHAIN_ID } from "./types.js";
 export type { WalletIntegrationConfig } from "./config-adapter.js";
-export { resolveStateDir } from "./config-adapter.js";
+export { resolveStateDir, resolveStateDirForPeer } from "./config-adapter.js";
 
 const WELL_KNOWN_CHAIN_IDS: Record<string, number> = {
   sepolia: SEPOLIA_CHAIN_ID,
